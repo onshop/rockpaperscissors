@@ -1,0 +1,34 @@
+# truffle system files
+.node-xmlhttprequest-*
+truffle-config.js
+tmp-*
+
+# truffle build directory
+/client/src/contracts/
+/contracts/artifacts/
+
+# system files
+*.swp
+*.swo
+
+# Logs
+logs
+*.log
+
+# Dependency directory
+node_modules
+
+# Debug log from npm
+npm-debug.log
+
+# local env variables
+.env
+
+# macOS
+.DS_Store
+
+# IntelliJ IDE
+.idea
+
+
+
