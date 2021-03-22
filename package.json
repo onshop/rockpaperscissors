@@ -1,0 +1,26 @@
+{
+  "name": "rockpaperscissors",
+  "version": "1.0.0",
+  "description": "Ethereum contract to enable two players to play the classic rock paper scissors game.",
+  "main": "truffle-config.js",
+  "directories": {
+    "test": "test"
+  },
+  "dependencies": {
+    "-": "0.0.1",
+    "@openzeppelin/contracts": "^3.3.0"
+  },
+  "scripts": {
+    "test": "test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/onshop/rockpaperscissors.git"
+  },
+  "author": "Ben Parish",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/onshop/rockpaperscissors/issues"
+  },
+  "homepage": "https://github.com/onshop/rockpaperscissors#readme"
+}
