@@ -113,11 +113,12 @@ contract RockPaperScissors is Ownable, Pausable {
 
         Game storage game = games[gameToken];
 
-        require(game.stake != 0, GAME_NOT_FOUND_MSG);
+        uint256 stake = game.stake;
+        require(stake != 0, GAME_NOT_FOUND_MSG);
         require(msg.sender == game.playerOne || msg.sender == game.playerTwo, INVALID_PLAYER_MSG);
 
         uint256 stakerBalance = balances[msg.sender];
-        require(stakerBalance >= game.stake, "Insufficient funds to play");
+        require(stakerBalance >= stake, "Insufficient funds to play");
 
         if (msg.sender == game.playerOne) {
             require(game.playerOneMoveHash == bytes32(0), ALREADY_MOVED_MSG);
@@ -134,25 +135,32 @@ contract RockPaperScissors is Ownable, Pausable {
             emit AllPlayersMoved(gameToken);
         }
 
-        balances[msg.sender] = SafeMath.sub(stakerBalance, game.stake);
+        balances[msg.sender] = SafeMath.sub(stakerBalance, stake);
     }
 
     function revealPlayerMove(bytes32 gameToken, bytes32 secret, uint8 playerMove) external whenNotPaused {
         Game storage game = games[gameToken];
 
-        require(msg.sender == game.playerOne || msg.sender == game.playerTwo, INVALID_PLAYER_MSG);
+        address playerOne = game.playerOne;
+        address playerTwo= game.playerTwo;
+
+        require(msg.sender == playerOne || msg.sender == playerTwo, INVALID_PLAYER_MSG);
         require(playerMove > 0 && playerMove < 4, "Invalid move");
-        require(game.playerOneMoveHash != bytes32(0) && game.playerTwoMoveHash != bytes32(0), GAME_IN_PROGRESS_MSG);
 
-        bytes32 expectedMoveToken = hashPlayerMove(gameToken, msg.sender, secret, playerMove);
+        bytes32 playerOneMoveHash = game.playerOneMoveHash;
+        bytes32 playerTwoMoveHash= game.playerTwoMoveHash;
 
-        if (msg.sender == game.playerOne) {
-            require(game.playerOneMoveHash == expectedMoveToken, BAD_MATCH_MSG);
+        require(playerOneMoveHash != bytes32(0) && playerTwoMoveHash != bytes32(0), GAME_IN_PROGRESS_MSG);
+
+        bytes32 expectedMoveHash = hashPlayerMove(gameToken, msg.sender, secret, playerMove);
+
+        if (msg.sender == playerOne) {
+            require(playerOneMoveHash == expectedMoveHash, BAD_MATCH_MSG);
             game.playerOneMove = playerMove;
         }
 
-        if (msg.sender == game.playerTwo) {
-            require(game.playerTwoMoveHash == expectedMoveToken, BAD_MATCH_MSG);
+        if (msg.sender == playerTwo) {
+            require(playerTwoMoveHash == expectedMoveHash, BAD_MATCH_MSG);
             game.playerTwoMove = playerMove;
         }
 
