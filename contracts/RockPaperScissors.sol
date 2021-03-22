@@ -89,7 +89,7 @@ contract RockPaperScissors is Ownable, Pausable {
         emit Deposit(msg.sender, msg.value);
     }
 
-    function initialise(bytes32 gameToken, address playerOne, address playerTwo, uint stake) external whenNotPaused onlyOwner {
+    function initialise(bytes32 gameToken, address playerOne, address playerTwo, uint stake) external whenNotPaused {
 
         require(playerOne != msg.sender, "Caller cannot be player one");
         require(playerTwo != msg.sender, "Caller cannot be player two");
@@ -169,7 +169,7 @@ contract RockPaperScissors is Ownable, Pausable {
         }
     }
 
-    function determineWinner(bytes32 gameToken) external onlyOwner whenNotPaused {
+    function determineWinner(bytes32 gameToken) external whenNotPaused {
         Game storage game = games[gameToken];
         require(game.stake != 0, GAME_NOT_FOUND_MSG);
 
@@ -261,6 +261,7 @@ contract RockPaperScissors is Ownable, Pausable {
     function hashPlayerMove(bytes32 gameToken, address player, bytes32 secret, uint playerMove) public view returns (bytes32) {
         require(secret != bytes32(0), "Secret cannot be empty");
         require(player != NULL_ADDRESS, "Address cannot be zero");
+        require(playerMove > 0 && playerMove < 4, "Invalid move");
 
         return keccak256(abi.encodePacked(gameToken, player, secret, playerMove, address(this)));
     }
