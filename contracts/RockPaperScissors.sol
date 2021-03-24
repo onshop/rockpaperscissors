@@ -14,21 +14,20 @@ contract RockPaperScissors is Ownable, Pausable {
     mapping(bytes32 => Game) public games;
 
     address private constant NULL_ADDRESS = address(0);
-    string private constant NO_STAKE_TO_WITHDRAW_MSG = "No stake to withdraw";
-    string private constant BAD_MATCH_MSG = "Move and secret do not match";
-    string private constant ALREADY_MOVED_MSG = "Already moved";
     string private constant INVALID_PLAYER_MSG = "Invalid player";
     string private constant GAME_NOT_FOUND_MSG = "Game not found";
-    string private constant GAME_IN_PROGRESS_MSG = "Game in progress";
+    string private constant INVALID_MOVE_MSG = "Invalid move";
+
+    uint256 constant FORFEIT_WINDOW = 12 hours;
+    uint256 constant FEE_PERCENTAGE = 10;
 
     struct Game {
-        address playerOne;
-        address playerTwo;
+        address creator;
         uint256 stake;
-        bytes32 playerOneMoveHash;
-        bytes32 playerTwoMoveHash;
-        uint8 playerOneMove;
-        uint8 playerTwoMove;
+        bytes32 moveHash;
+        address opponent;
+        uint8 opponentMove;
+        uint256 expiryDate;
     }
 
     event Deposit(
@@ -36,35 +35,29 @@ contract RockPaperScissors is Ownable, Pausable {
         uint256 amount
     );
 
-    event GameInitialised(
-        address indexed initiator,
+    event GameCreated(
+        address indexed creator,
         bytes32 indexed token,
-        address playerOne,
-        address playerTwo,
         uint256 stake
     );
 
-    event PlayerMove(
-        address indexed player,
-        bytes32 indexed token
+    event OpponentPlays(
+        address indexed opponent,
+        bytes32 indexed token,
+        uint8 move
     );
 
     event Draw(
         bytes32 indexed token
     );
 
-    event AllPlayersMoved(
-        bytes32 indexed token
-    );
-
-    event AllMovesRevealed(
-        bytes32 indexed token
-    );
-
     event WinnerRewarded(
-        bytes32 indexed token,
+        bytes32 indexed gameToken,
         address indexed winner,
-        uint256 winnings
+        address indexed loser,
+        uint256 winnings,
+        uint8 creatorMove,
+        uint8 opponentMove
     );
 
     event WithDraw(
@@ -72,15 +65,17 @@ contract RockPaperScissors is Ownable, Pausable {
         uint amount
     );
 
-    event  PlayerWithdraws(
+    event  CreatorEndsGame(
         address indexed player,
-        bytes32 indexed token,
+        bytes32 indexed gameToken,
         uint256 refund
     );
 
-    uint8 constant ROCK = 1;
-    uint8 constant PAPER = 2;
-    uint8 constant SCISSORS = 3;
+    event  ForfeitPaid(
+        address indexed player,
+        bytes32 indexed gameToken,
+        uint256 forfeit
+    );
 
     function deposit() external payable whenNotPaused {
 
@@ -89,124 +84,113 @@ contract RockPaperScissors is Ownable, Pausable {
         emit Deposit(msg.sender, msg.value);
     }
 
-    function initialise(bytes32 gameToken, address playerOne, address playerTwo, uint stake) external whenNotPaused {
-
-        require(playerOne != msg.sender, "Caller cannot be player one");
-        require(playerTwo != msg.sender, "Caller cannot be player two");
-        require(playerOne != address(0), "Player one cannot be empty");
-        require(playerTwo != address(0), "Player two cannot be empty");
-        require(playerOne != playerTwo, "Player one and two are the same");
-
-        Game storage game = games[gameToken];
-
-        game.playerOne = playerOne;
-        game.playerTwo = playerTwo;
-        game.stake = stake;
-
-        emit GameInitialised(msg.sender, gameToken, playerOne, playerTwo, stake);
-    }
-
-    function play(bytes32 gameToken, bytes32 playerMoveHash) public whenNotPaused {
+    function create(bytes32 gameToken, bytes32 playerMoveHash, uint stake) external payable whenNotPaused  returns(bytes32){
 
         require(gameToken != bytes32(0), "Game token cannot be empty");
-        require(playerMoveHash != bytes32(0), "Move token cannot be empty");
+        require(stake > 0, "Stake cannot be zero");
+
+        //Introduced some uniqueness in case the same token is reused
+        bytes32 hashedGameToken = keccak256(abi.encodePacked(gameToken, block.timestamp));
+
+        Game storage game = games[hashedGameToken];
+        require(game.creator == NULL_ADDRESS, "Token already in use");
+
+        emit GameCreated(msg.sender, hashedGameToken, stake);
+
+        game.creator = msg.sender;
+        game.stake = stake;
+        game.moveHash = playerMoveHash;
+        fundMove(stake);
+
+        return hashedGameToken;
+    }
+
+    /*
+    * The opponent makes their move and waits for the creator to resolve the game by revealing their move
+    */
+    function opponentPlay(bytes32 gameToken, uint8 playerMove) external payable whenNotPaused {
 
         Game storage game = games[gameToken];
-
         uint256 stake = game.stake;
         require(stake != 0, GAME_NOT_FOUND_MSG);
-        require(msg.sender == game.playerOne || msg.sender == game.playerTwo, INVALID_PLAYER_MSG);
+        require(game.opponent == NULL_ADDRESS, "Opponent has already moved");
+        require(playerMove < 3, INVALID_MOVE_MSG);
 
-        uint256 stakerBalance = balances[msg.sender];
-        require(stakerBalance >= stake, "Insufficient funds to play");
+        emit OpponentPlays(msg.sender, gameToken, playerMove);
 
-        if (msg.sender == game.playerOne) {
-            require(game.playerOneMoveHash == bytes32(0), ALREADY_MOVED_MSG);
-            game.playerOneMoveHash = playerMoveHash;
-        }
-        if (msg.sender == game.playerTwo) {
-            require(game.playerTwoMoveHash == bytes32(0), ALREADY_MOVED_MSG);
-            game.playerTwoMoveHash = playerMoveHash;
-        }
-
-        emit PlayerMove(msg.sender, gameToken);
-
-        if(game.playerOneMoveHash != bytes32(0) && game.playerTwoMoveHash != bytes32(0)){
-            emit AllPlayersMoved(gameToken);
-        }
-
-        balances[msg.sender] = SafeMath.sub(stakerBalance, stake);
+        game.opponent = msg.sender;
+        game.opponentMove = playerMove;
+        game.expiryDate =  block.timestamp + FORFEIT_WINDOW;
+        fundMove(stake);
     }
 
-    function revealPlayerMove(bytes32 gameToken, bytes32 secret, uint8 playerMove) external whenNotPaused {
-        Game storage game = games[gameToken];
 
-        address playerOne = game.playerOne;
-        address playerTwo= game.playerTwo;
-
-        require(msg.sender == playerOne || msg.sender == playerTwo, INVALID_PLAYER_MSG);
-        require(playerMove > 0 && playerMove < 4, "Invalid move");
-
-        bytes32 playerOneMoveHash = game.playerOneMoveHash;
-        bytes32 playerTwoMoveHash= game.playerTwoMoveHash;
-
-        require(playerOneMoveHash != bytes32(0) && playerTwoMoveHash != bytes32(0), GAME_IN_PROGRESS_MSG);
-
-        bytes32 expectedMoveHash = hashPlayerMove(gameToken, msg.sender, secret, playerMove);
-
-        if (msg.sender == playerOne) {
-            require(playerOneMoveHash == expectedMoveHash, BAD_MATCH_MSG);
-            game.playerOneMove = playerMove;
-        }
-
-        if (msg.sender == playerTwo) {
-            require(playerTwoMoveHash == expectedMoveHash, BAD_MATCH_MSG);
-            game.playerTwoMove = playerMove;
-        }
-
-        if (game.playerOneMove != 0 && game.playerTwoMove != 0) {
-            emit AllMovesRevealed(gameToken);
+    function fundMove(uint256 stake) internal {
+        uint256 senderBalance = balances[msg.sender];
+        uint256 fee = stake * 100/ FEE_PERCENTAGE;
+        if (msg.value == 0){
+            balances[msg.sender] = SafeMath.sub(senderBalance, stake + fee);
+        } else if(msg.value > stake + fee){
+            balances[msg.sender] = senderBalance.add(msg.value - stake + fee);
+        } else {
+            require(balances[msg.sender] >= stake + fee - msg.value, "Insufficient balance");
+            balances[msg.sender] = SafeMath.sub(senderBalance, stake + fee - msg.value);
         }
     }
 
-    function determineWinner(bytes32 gameToken) external whenNotPaused {
-        Game storage game = games[gameToken];
-        require(game.stake != 0, GAME_NOT_FOUND_MSG);
+    /**
+    * Once the opponent has made their move, the creator of the game must resolve to determine the winner
+    * and reward the winner.
+    * If the creator does not resolve the game then the opponent can collect their winnings
+     * after the forfeit window has expired.
+    */
+    function resolveGame(bytes32 gameToken, bytes32 secret, uint8 creatorMove) external whenNotPaused {
 
-        if(game.playerOneMove == game.playerTwoMove){
+        Game storage game = games[gameToken];
+
+        require(msg.sender == game.creator, INVALID_PLAYER_MSG);
+        require(creatorMove < 3, INVALID_MOVE_MSG);
+
+        address opponent = game.opponent;
+        require(opponent != NULL_ADDRESS , "Awaiting opponent");
+
+        //Validate move
+        bytes32 expectedMoveHash = hashPlayerMove(gameToken, secret, creatorMove);
+        require(game.moveHash == expectedMoveHash, "Move and secret do not match");
+
+        uint8 opponentMove = game.opponentMove;
+        uint256 stake = game.stake;
+        uint256 fee = stake * (FEE_PERCENTAGE /100);
+
+        //Draw
+        if(opponentMove == creatorMove){
             resetGame(game);
             emit Draw(gameToken);
+            balances[msg.sender] = balances[msg.sender].add(stake + fee);
+            balances[opponent] = balances[opponent].add(stake + fee);
             return;
         }
 
+        //Determine winner
         address winner;
+        address loser;
+        uint256 winnings = (game.stake * 2);
 
-        if (isWinningMove(game.playerOneMove, game.playerTwoMove)) {
-            winner = game.playerOne;
-        } else {
-            winner = game.playerTwo;
+        // Creator is rewarded for resolving by getting their fee back
+        // Contract keeps the opponent's fee
+        if ((opponentMove + 1) % 3 == creatorMove) { // Creator wins
+            winner = game.creator;
+            winnings = winnings + fee;
+            balances[msg.sender] = balances[msg.sender].add(winnings + fee);
+        } else { // Opponent wins
+            winner = game.opponent;
+            balances[opponent] = balances[opponent].add(winnings);
+            balances[msg.sender] = balances[msg.sender].add(fee); // // Creator rewarded
         }
 
-        uint winnings = game.stake * 2;
+        //Reward winner
         resetGame(game);
-        emit WinnerRewarded(gameToken, winner, winnings);
-
-        balances[winner] = balances[winner].add(winnings);
-    }
-
-    function isWinningMove(uint8 playerOneMove, uint8 playerTwoMove) internal pure returns (bool) {
-
-        if (playerOneMove == ROCK && playerTwoMove == SCISSORS) {
-            return true;
-        }
-        if (playerOneMove == PAPER && playerTwoMove == ROCK) {
-            return true;
-        }
-        if (playerOneMove == SCISSORS && playerTwoMove == PAPER) {
-            return true;
-        }
-
-        return false;
+        emit WinnerRewarded(gameToken, winner, loser, winnings, creatorMove, opponentMove);
     }
 
     function withdraw(uint amount) external whenNotPaused returns(bool success) {
@@ -221,49 +205,60 @@ contract RockPaperScissors is Ownable, Pausable {
         require(success, "Transfer failed");
     }
 
-    function withDrawFromGame(bytes32 gameToken) whenNotPaused external whenNotPaused {
+    /*
+    * If no opponent has played the game then the creator of the game can terminate the game
+    * and collect their stake
+    */
+    function endGame(bytes32 gameToken) whenNotPaused external whenNotPaused {
         Game storage game = games[gameToken];
         uint256 stake = game.stake;
         require(stake != 0, GAME_NOT_FOUND_MSG);
-        require(msg.sender == game.playerOne || msg.sender == game.playerTwo, INVALID_PLAYER_MSG);
+        address creator = game.creator;
+        require(msg.sender == creator, INVALID_PLAYER_MSG);
 
-        if (msg.sender == game.playerOne) {
-            require(game.playerTwoMoveHash == bytes32(0), GAME_IN_PROGRESS_MSG);
-            require(game.playerOneMoveHash != bytes32(0), NO_STAKE_TO_WITHDRAW_MSG);
+        // No opponent has played so refund
+        if(game.opponent == NULL_ADDRESS){
+            resetGame(game);
+            emit CreatorEndsGame(creator, gameToken, stake);
+            balances[creator] = balances[creator].add(stake);
+            return;
         }
+        revert("Game unresolved");
+    }
 
-        if (msg.sender == game.playerTwo) {
-            require(game.playerOneMoveHash == bytes32(0), GAME_IN_PROGRESS_MSG);
-            require(game.playerTwoMoveHash != bytes32(0), NO_STAKE_TO_WITHDRAW_MSG);
-        }
+    /*
+    * If expiry has passed, the opponent receives their stake and the forfeited stake
+    * They also get their fee refunded as compensation
+    * Creator's fee/deposit is kept by the contract
+    */
+    function collectForfeit(bytes32 gameToken) whenNotPaused external whenNotPaused {
+        Game storage game = games[gameToken];
+        uint256 stake = game.stake;
+        require(stake != 0, GAME_NOT_FOUND_MSG);
+        address opponent = game.opponent;
 
-        emit PlayerWithdraws(msg.sender, gameToken, stake);
+        require(msg.sender == opponent, INVALID_PLAYER_MSG);
+
+        require(block.timestamp >= game.expiryDate, "Awaiting game resolution");
+
+        uint forfeit = (stake * 2) + (stake * FEE_PERCENTAGE /100);
+        emit ForfeitPaid(opponent, gameToken, forfeit);
         resetGame(game);
-
-        balances[msg.sender] = balances[msg.sender].add(stake);
+        balances[opponent] = balances[opponent].add(forfeit);
     }
 
     function resetGame(Game storage game) internal {
         game.stake = 0;
-        game.playerOneMove = 0;
-        game.playerTwoMove = 0;
-        game.playerOneMoveHash = bytes32(0);
-        game.playerTwoMoveHash = bytes32(0);
+        game.moveHash = bytes32(0);
+        game.opponentMove = 0;
     }
 
-    function createGameToken(address playerOne, address playerTwo) external view returns (bytes32){
-        require(playerOne != NULL_ADDRESS, "1st address cannot be zero");
-        require(playerTwo != NULL_ADDRESS, "2nd address cannot be zero");
-
-        return keccak256(abi.encodePacked(playerOne, playerTwo, address(this)));
-    }
-
-    function hashPlayerMove(bytes32 gameToken, address player, bytes32 secret, uint playerMove) public view returns (bytes32) {
+    function hashPlayerMove(bytes32 gameToken, bytes32 secret, uint move) public view returns (bytes32) {
+        require(gameToken != bytes32(0), "Game token cannot be empty");
         require(secret != bytes32(0), "Secret cannot be empty");
-        require(player != NULL_ADDRESS, "Address cannot be zero");
-        require(playerMove > 0 && playerMove < 4, "Invalid move");
+        require(move < 3, INVALID_MOVE_MSG);
 
-        return keccak256(abi.encodePacked(gameToken, player, secret, playerMove, address(this)));
+        return keccak256(abi.encodePacked(gameToken, msg.sender, secret, move));
     }
 
     function pause() public onlyOwner {
