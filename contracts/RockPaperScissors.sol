@@ -127,7 +127,7 @@ contract RockPaperScissors is Ownable, Pausable {
 
     function fundMove(uint256 stake) internal {
         uint256 senderBalance = balances[msg.sender];
-        uint256 fee = stake * 100/ FEE_PERCENTAGE;
+        uint256 fee = stake * FEE_PERCENTAGE/100;
         if (msg.value == 0){
             balances[msg.sender] = SafeMath.sub(senderBalance, stake + fee);
         } else if(msg.value > stake + fee){
@@ -160,7 +160,7 @@ contract RockPaperScissors is Ownable, Pausable {
 
         uint8 opponentMove = game.opponentMove;
         uint256 stake = game.stake;
-        uint256 fee = stake * (FEE_PERCENTAGE /100);
+        uint256 fee = stake * FEE_PERCENTAGE/100;
 
         //Draw
         if(opponentMove == creatorMove){
@@ -241,7 +241,7 @@ contract RockPaperScissors is Ownable, Pausable {
 
         require(block.timestamp >= game.expiryDate, "Awaiting game resolution");
 
-        uint forfeit = (stake * 2) + (stake * FEE_PERCENTAGE /100);
+        uint forfeit = (stake * 2) + (stake * FEE_PERCENTAGE/100);
         emit ForfeitPaid(opponent, gameToken, forfeit);
         resetGame(game);
         balances[opponent] = balances[opponent].add(forfeit);
