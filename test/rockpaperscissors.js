@@ -41,7 +41,7 @@ contract('rcp', async accounts => {
         return toBN(txObj.receipt.gasUsed).mul(toBN(tx.gasPrice));
     };
 
-    const [contractOwner, gameManager, playerOne, playerTwo] = accounts;
+    const [contractOwner, playerOne, playerTwo] = accounts;
     const playerOneSecretBytes32 = await soliditySha3(playerOneSecretString);
     const playerTwoSecretBytes32 = await soliditySha3(playerTwoSecretString);
 
