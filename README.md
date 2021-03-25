@@ -17,6 +17,5 @@ User journey/sequence is as follows:
    
 ### Thoughts
 
-1. If I was setting a minimum stake (so that the fee covers gas, would that be determined on the front end?)
-2. I was considering that perhaps the contract owner should be able to flexibly set a minimum stake and the fee percentage
+1. I was considering that perhaps the contract owner should be able to flexibly set a minimum stake and the fee percentage
 with setter functions.
