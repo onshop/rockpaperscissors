@@ -13,9 +13,10 @@ User journey/sequence is as follows:
    This also compensates the game creator for the gas costs of managing the game.
    If the creator does no reveal, they not only lose their stake but also the fee (10%) charged to the opponent.
 4. If the creator fails to reveal, after the expiry date then the opponent can claim back their stake and the creator's stake
-   As compensation for delayed payment and inconvenience, they do not pay any fee for playing.
+   as compensation for delayed payment and inconvenience, they do not pay any fee for playing.
    
 ### Thoughts
 
 1. I was considering that perhaps the contract owner should be able to flexibly set a minimum stake and the fee percentage
 with setter functions.
+2. Should I be setting a minimum stake based on the gas costs?
