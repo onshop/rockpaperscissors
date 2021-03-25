@@ -4,8 +4,8 @@ Ethereum contract to enable two players to play the classic rock paper scissors 
 
 User journey/sequence is as follows:
 
-1. A player (creator) initialises the game. The game token is returned for subsequent calls is generated.
-   They can send value to fund it at the same time or from their existing balance.
+1. A player (creator) initialises the game. The contract generates a game token that is returned for use in subsequent 
+   calls is generated. They can send value to fund it at the same time or from their existing balance.
 2. Another player(opponent) plays the game.
    An expiry date on the contract is set for the creator to reveal and avoid a forfeit.
 3. The creator must then reveal to determine the winner and then winner's balance is funded with the winnings.
