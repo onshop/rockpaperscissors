@@ -94,12 +94,11 @@ contract RockPaperScissors is Ownable, Pausable {
         Game storage game = games[gameToken];
         require(game.creator == NULL_ADDRESS, "Token already in use");
 
-        emit GameCreated(msg.sender, gameToken, stake);
-
         game.creator = msg.sender;
         game.stake = stake;
         game.moveHash = playerMoveHash;
         fundMove(stake);
+        emit GameCreated(msg.sender, gameToken, stake);
 
         return gameToken;
     }
@@ -115,12 +114,10 @@ contract RockPaperScissors is Ownable, Pausable {
         require(game.opponent == NULL_ADDRESS, "Opponent has already moved");
         require(playerMove < 3, INVALID_MOVE_MSG);
 
-        emit OpponentPlays(msg.sender, gameToken, playerMove);
-
-        game.opponent = msg.sender;
         game.opponentMove = playerMove;
         game.expiryDate =  block.timestamp + FORFEIT_WINDOW;
         fundMove(stake);
+        emit OpponentPlays(msg.sender, gameToken, playerMove);
     }
 
 
@@ -199,8 +196,8 @@ contract RockPaperScissors is Ownable, Pausable {
         require(amount > 0, "The value must be greater than 0");
         require(withdrawerBalance >= amount, "There are insufficient funds");
 
-        emit WithDraw(msg.sender, amount);
         balances[msg.sender] = SafeMath.sub(withdrawerBalance, amount);
+        emit WithDraw(msg.sender, amount);
 
         (success, ) = msg.sender.call{value: amount}("");
         require(success, "Transfer failed");
@@ -221,8 +218,8 @@ contract RockPaperScissors is Ownable, Pausable {
 
         // No opponent has yet played so refund
         resetGame(game);
-        emit CreatorEndsGame(creator, gameToken, stake);
         balances[creator] = balances[creator].add(stake);
+        emit CreatorEndsGame(creator, gameToken, stake);
     }
 
     /*
@@ -241,10 +238,9 @@ contract RockPaperScissors is Ownable, Pausable {
         require(block.timestamp >= game.expiryDate, "Awaiting game resolution");
 
         uint256 forfeit = stake * 2;
-        emit ForfeitPaid(opponent, gameToken, forfeit);
         resetGame(game);
-
         balances[opponent] = balances[opponent].add(forfeit);
+        emit ForfeitPaid(opponent, gameToken, forfeit);
     }
 
     function resetGame(Game storage game) internal {
