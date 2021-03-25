@@ -117,14 +117,16 @@ contract RockPaperScissors is Ownable, Pausable {
     function fundMove(uint256 stake) internal {
         uint256 senderBalance = balances[msg.sender];
 
-        if (msg.value < stake) {
-            require(balances[msg.sender] >= stake - msg.value, "Insufficient balance");
-            balances[msg.sender] = SafeMath.sub(senderBalance, stake - msg.value);
+        if (msg.value == stake) {
             return;
         }
 
-        balances[msg.sender] = senderBalance.add(msg.value - stake);
-        return;
+        if (msg.value < stake) {
+            require(senderBalance >= stake - msg.value, "Insufficient balance");
+            balances[msg.sender] = SafeMath.sub(senderBalance, stake - msg.value);
+        } else {
+            balances[msg.sender] = senderBalance.add(msg.value - stake);
+        }
     }
 
     /**
