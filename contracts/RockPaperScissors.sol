@@ -37,7 +37,7 @@ contract RockPaperScissors is Ownable, Pausable {
 
     event GameCreated(
         address indexed creator,
-        bytes32 indexed token,
+        bytes32 indexed gameToken,
         uint256 stake
     );
 
@@ -84,25 +84,24 @@ contract RockPaperScissors is Ownable, Pausable {
         emit Deposit(msg.sender, msg.value);
     }
 
-    function create(bytes32 gameToken, bytes32 playerMoveHash, uint stake) external payable whenNotPaused  returns(bytes32){
+    function create(bytes32 playerMoveHash, uint stake) external payable whenNotPaused  returns(bytes32){
 
-        require(gameToken != bytes32(0), "Game token cannot be empty");
+        require(playerMoveHash != bytes32(0), "Player move cannot be empty");
         require(stake > 0, "Stake cannot be zero");
 
-        //Introduced some uniqueness in case the same token is reused
-        bytes32 hashedGameToken = keccak256(abi.encodePacked(gameToken, block.timestamp));
+        bytes32 gameToken = keccak256(abi.encodePacked(msg.sender, block.timestamp));
 
-        Game storage game = games[hashedGameToken];
+        Game storage game = games[gameToken];
         require(game.creator == NULL_ADDRESS, "Token already in use");
 
-        emit GameCreated(msg.sender, hashedGameToken, stake);
+        emit GameCreated(msg.sender, gameToken, stake);
 
         game.creator = msg.sender;
         game.stake = stake;
         game.moveHash = playerMoveHash;
         fundMove(stake);
 
-        return hashedGameToken;
+        return gameToken;
     }
 
     /*
