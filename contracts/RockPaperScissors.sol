@@ -77,13 +77,6 @@ contract RockPaperScissors is Ownable, Pausable {
         uint256 forfeit
     );
 
-    function deposit() external payable whenNotPaused {
-
-        balances[msg.sender] = balances[msg.sender].add(msg.value);
-
-        emit Deposit(msg.sender, msg.value);
-    }
-
     function create(bytes32 playerMoveHash, uint stake) external payable whenNotPaused  returns(bytes32){
 
         require(playerMoveHash != bytes32(0), "Player move cannot be empty");
