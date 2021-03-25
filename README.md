@@ -15,7 +15,7 @@ User journey/sequence is as follows:
 4. If the creator fails to reveal, after the expiry date then the opponent can claim back their stake and the creator's stake
    As compensation for delayed payment and inconvenience, they do not pay any fee for playing.
    
-###Thoughts
+### Thoughts
 
 1. If I was setting a minimum stake (so that the fee covers gas, would that be determined on the front end?)
 2. I was considering that perhaps the contract owner should be able to flexibly set a minimum stake and the fee percentage
