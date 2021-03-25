@@ -1,4 +1,5 @@
-# rockpaperscissors
+## Rock Paper Scissors
+
 Ethereum contract to enable two players to play the classic rock paper scissors game.
 
 User journey/sequence is as follows:
