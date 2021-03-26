@@ -8,9 +8,9 @@ import {SafeMath} from "./math/SafeMath.sol";
 
 contract RockPaperScissors is Ownable, Pausable {
 
-    using SafeMath for uint;
+    using SafeMath for uint256;
 
-    mapping(address => uint) public balances;
+    mapping(address => uint256) public balances;
     mapping(bytes32 => Game) public games;
 
     address private constant NULL_ADDRESS = address(0);
@@ -108,7 +108,8 @@ contract RockPaperScissors is Ownable, Pausable {
         require(playerMove < 3, INVALID_MOVE_MSG);
 
         game.opponentMove = playerMove;
-        game.expiryDate =  block.timestamp + FORFEIT_WINDOW;
+        game.expiryDate =  block.timestamp.add(FORFEIT_WINDOW);
+        game.opponent = msg.sender;
         fundMove(stake);
         emit OpponentPlays(msg.sender, gameToken, playerMove);
     }
@@ -122,10 +123,10 @@ contract RockPaperScissors is Ownable, Pausable {
         }
 
         if (msg.value < stake) {
-            require(senderBalance >= stake - msg.value, "Insufficient balance");
-            balances[msg.sender] = SafeMath.sub(senderBalance, stake - msg.value);
+            require(senderBalance >= stake.sub(msg.value), "Insufficient balance");
+            balances[msg.sender] = senderBalance.sub(stake).sub(msg.value);
         } else {
-            balances[msg.sender] = senderBalance.add(msg.value - stake);
+            balances[msg.sender] = senderBalance.add(msg.value).sub(stake);
         }
     }
 
@@ -165,20 +166,20 @@ contract RockPaperScissors is Ownable, Pausable {
         //Determine winner
         address winner;
         address loser;
-        uint256 winnings = stake * 2;
-        uint256 fee = stake * FEE_PERCENTAGE/100;
+        uint256 winnings = SafeMath.mul(stake, 2);
+        uint256 fee = SafeMath.mul(stake, FEE_PERCENTAGE).div(100);
 
         // If the creator wins then is rewarded by not paying a fee on the winnings
-        if ((opponentMove + 1) % 3 == creatorMove) {
+        if (mod(opponentMove.add(1), 3) == creatorMove) {
             winner = creator;
             loser = opponent;
-            winnings = winnings + fee;
+            winnings = winnings.add(fee);
             balances[creator] = balances[creator].add(winnings);
         // If the creator loses then rewarded by being able to charge the opponent with a player's fee
         } else {
             winner = opponent;
             loser = creator;
-            balances[opponent] = balances[opponent].add(winnings - fee);
+            balances[opponent] = balances[opponent].add(winnings).sub(fee);
             balances[creator] = balances[creator].add(fee); // Creator rewarded
         }
 
@@ -191,7 +192,7 @@ contract RockPaperScissors is Ownable, Pausable {
         require(amount > 0, "The value must be greater than 0");
         require(withdrawerBalance >= amount, "There are insufficient funds");
 
-        balances[msg.sender] = SafeMath.sub(withdrawerBalance, amount);
+        balances[msg.sender] = withdrawerBalance.sub(withdrawerBalance, amount);
         emit WithDraw(msg.sender, amount);
 
         (success, ) = msg.sender.call{value: amount}("");
@@ -232,7 +233,7 @@ contract RockPaperScissors is Ownable, Pausable {
 
         require(block.timestamp >= game.expiryDate, "Awaiting game resolution");
 
-        uint256 forfeit = stake * 2;
+        uint256 forfeit = SafeMath.mul(stake, 2);
         resetGame(game);
         balances[opponent] = balances[opponent].add(forfeit);
         emit ForfeitPaid(opponent, gameToken, forfeit);
