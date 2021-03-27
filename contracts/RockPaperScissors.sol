@@ -20,6 +20,7 @@ contract RockPaperScissors is Ownable, Pausable {
     string private constant INVALID_MOVE_MSG = "Invalid move";
     string private constant INVALID_STEP_MSG = "Invalid step";
     string private constant HASH_MISMATCH_MSG = "Move and secret do not match";
+    string private constant GAME_NOT_EXPIRED_MSG = "Game has not expired";
 
     uint256 constant FORFEIT_WINDOW = 12 hours;
     uint256 constant FEE_PERCENTAGE = 10;
@@ -209,7 +210,7 @@ contract RockPaperScissors is Ownable, Pausable {
         require(game.step <= uint8(Steps.PLAYER_ONE_REVEAL), INVALID_STEP_MSG);
         address playerOne = game.playerOne;
         require(msg.sender == playerOne, INVALID_PLAYER_MSG);
-        require(block.timestamp >= game.expiryDate, "Game has not expired");
+        require(block.timestamp >= game.expiryDate, GAME_NOT_EXPIRED_MSG);
 
         uint256 forfeit = SafeMath.mul(game.stake, 2);
         resetGame(game);
@@ -228,7 +229,7 @@ contract RockPaperScissors is Ownable, Pausable {
         require(game.step == uint8(Steps.PLAYER_TWO_MOVE), INVALID_STEP_MSG);
         address playerTwo = game.playerTwo;
         require(msg.sender == playerTwo, INVALID_PLAYER_MSG);
-        require(block.timestamp >= game.expiryDate, "Game has not expired");
+        require(block.timestamp >= game.expiryDate, GAME_NOT_EXPIRED_MSG);
 
         uint256 forfeit = SafeMath.mul(game.stake, 2);
         resetGame(game);
@@ -268,7 +269,7 @@ contract RockPaperScissors is Ownable, Pausable {
 
     // Even if the secret is reused, the hash will always be unique because the game key will be unique
     function createPlayerTwoMoveHash(bytes32 gameKey, bytes32 secret, uint move) public view returns (bytes32) {
-        require(gameKey != bytes32(0), "Game token cannot be empty");
+        require(gameKey != bytes32(0), "Game key cannot be empty");
         require(secret != bytes32(0), "Secret cannot be empty");
         require(move < 3, INVALID_MOVE_MSG);
 
