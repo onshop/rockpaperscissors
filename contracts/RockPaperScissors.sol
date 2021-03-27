@@ -81,10 +81,10 @@ contract RockPaperScissors is Ownable, Pausable {
     );
 
     // The creator's move is embedded in the game key
-    function movePlayerOne(bytes32 gameKey, uint stake) external payable whenNotPaused {
+    function movePlayerOne(bytes32 moveHash, uint stake) external payable whenNotPaused {
 
-        require(gameKey != bytes32(0), "Game key cannot be empty");
-        Game storage game = games[gameKey];
+        require(moveHash != bytes32(0), "Game key cannot be empty");
+        Game storage game = games[moveHash];
         require(game.step == uint8(Steps.INIT), INVALID_STEP_MSG);
         require(game.playerOne == NULL_ADDRESS, INVALID_STEP_MSG);
 
@@ -136,7 +136,7 @@ contract RockPaperScissors is Ownable, Pausable {
         require(msg.sender == playerOne, INVALID_PLAYER_MSG);
 
         //Validate move
-        bytes32 expectedMoveHash = createGameKey(secret, playerOneMove);
+        bytes32 expectedMoveHash = createPlayerOneMoveHash(secret, playerOneMove);
         require(gameKey == expectedMoveHash, HASH_MISMATCH_MSG);
 
         game.playerOneMove = playerOneMove;
@@ -145,7 +145,7 @@ contract RockPaperScissors is Ownable, Pausable {
         emit PlayerReveals(msg.sender, gameKey, playerOneMove);
     }
 
-    function revealplayerTwo(bytes32 gameKey, bytes32 secret, uint8 playerTwoMove) external whenNotPaused {
+    function revealPlayerTwo(bytes32 gameKey, bytes32 secret, uint8 playerTwoMove) external whenNotPaused {
 
         require(playerTwoMove < 3, INVALID_MOVE_MSG);
         Game storage game = games[gameKey];
@@ -183,7 +183,7 @@ contract RockPaperScissors is Ownable, Pausable {
             loser = playerTwo;
         } else {
             winner = playerTwo;
-            loser = playerTwo;
+            loser = playerOne;
         }
         uint256 winnings = SafeMath.mul(stake, 2).sub(fee);
         balances[winner] = balances[winner].add(winnings);
@@ -260,7 +260,7 @@ contract RockPaperScissors is Ownable, Pausable {
     }
 
     // This can only be used once because it is used as a mapping key
-    function createGameKey(bytes32 secret, uint move) public view returns(bytes32) {
+    function createPlayerOneMoveHash(bytes32 secret, uint move) public view returns(bytes32) {
 
         require(secret != bytes32(0), "Secret cannot be empty");
         require(move < 3, INVALID_MOVE_MSG);
