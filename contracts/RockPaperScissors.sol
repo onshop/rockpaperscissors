@@ -195,7 +195,7 @@ contract RockPaperScissors is Ownable, Pausable {
         resetGame(game);
     }
 
-    function isWinner(uint8 playerOneMove, uint8 playerTwoMove) internal pure returns (bool) {
+    function isWinner(uint8 playerOneMove, uint8 playerTwoMove) public pure returns (bool) {
         return SafeMath.mod(playerTwoMove.add(1), 3) == playerOneMove;
     }
 
