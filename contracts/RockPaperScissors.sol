@@ -8,6 +8,7 @@ import {SafeMath} from "./math/SafeMath.sol";
 
 contract RockPaperScissors is Ownable, Pausable {
 
+    using SafeMath for uint8;
     using SafeMath for uint256;
 
     mapping(address => uint256) public balances;
@@ -18,6 +19,7 @@ contract RockPaperScissors is Ownable, Pausable {
     string private constant GAME_NOT_FOUND_MSG = "Game not found";
     string private constant INVALID_MOVE_MSG = "Invalid move";
     string private constant INVALID_STEP_MSG = "Invalid step";
+    string private constant HASH_MISMATCH_MSG = "Move and secret do not match";
 
     uint256 constant FORFEIT_WINDOW = 12 hours;
     uint256 constant FEE_PERCENTAGE = 10;
@@ -28,39 +30,39 @@ contract RockPaperScissors is Ownable, Pausable {
         PLAYER_TWO_MOVE,
         PLAYER_ONE_REVEAL,
         PLAYER_TWO_REVEAL,
-        END
+        RESET
     }
 
     struct Game {
         uint256 stake;
         address playerOne;
         address playerTwo;
-        uint8 playerTwoMoveHash;
+        bytes32 playerTwoMoveHash;
         uint8 playerOneMove;
-        uint8 playerTwoMove;
         uint256 expiryDate;
         uint8 step;
     }
 
-    event PlayerOneMoves(
+    event PlayerMoves(
         address indexed player,
         bytes32 indexed gameKey,
         uint256 value
     );
 
-    event PlayerTwoMoves(
-        address indexed player,
-        bytes32 indexed gameKey,
-        uint256 value
-    );
-
-    event PlayerTwoReveals(
+    event PlayerReveals(
         address indexed player,
         bytes32 indexed gameKey,
         uint8 move
     );
 
-    event WinnerRewarded(
+    event  DrawRefund(
+        address indexed playerOne,
+        address indexed playerTwo,
+        bytes32 indexed gameKey,
+        uint256 amount
+    );
+
+    event GamePayment(
         address indexed player,
         bytes32 indexed gameKey,
         uint256 amount
@@ -78,46 +80,42 @@ contract RockPaperScissors is Ownable, Pausable {
     );
 
     // The creator's move is embedded in the game key
-    function playerOneMove(bytes32 gameKey, uint stake) external payable whenNotPaused {
+    function movePlayerOne(bytes32 gameKey, uint stake) external payable whenNotPaused {
 
         require(gameKey != bytes32(0), "Game key cannot be empty");
-        require(stake > 0, "Stake cannot be zero");
-
         Game storage game = games[gameKey];
-        require(game.step == Steps.INIT, INVALID_STEP_MSG);
+        require(game.step == uint8(Steps.INIT), INVALID_STEP_MSG);
+        require(game.playerOne == NULL_ADDRESS, INVALID_STEP_MSG);
 
         game.playerOne = msg.sender;
-        game.stake = stake;
-        game.step = Steps.PLAYER_ONE_MOVE;
+        game.stake = game.stake;
+        game.step = uint8(Steps.PLAYER_ONE_MOVE);
         depositStake(stake);
 
-        emit PlayerOneMoves(msg.sender, gameKey, stake);
+        emit PlayerMoves(msg.sender, gameKey, stake);
     }
 
-    /*
-    * The opponent joins the game
-    */
-    function playerTwoMove(bytes32 gameKey, bytes32 moveHash) external payable whenNotPaused {
+    function movePlayerTwo(bytes32 gameKey, bytes32 moveHash) external payable whenNotPaused {
 
+        require(moveHash != bytes32(0), "Game key cannot be empty");
         Game storage game = games[gameKey];
-        uint256 stake = game.stake;
-        require(stake != 0, GAME_NOT_FOUND_MSG);
-        require(game.step == Steps.PLAYER_ONE_MOVE, INVALID_STEP_MSG);
+        require(game.step == uint8(Steps.PLAYER_ONE_MOVE), INVALID_STEP_MSG);
+        require(game.playerTwo == NULL_ADDRESS, INVALID_STEP_MSG);
 
         game.playerTwo = msg.sender;
         game.playerTwoMoveHash = moveHash;
-        game.step = steps.PLAYER_TWO_MOVE;
-        depositStake(stake);
+        game.step = uint8(Steps.PLAYER_TWO_MOVE);
+        depositStake(game.stake);
 
-        emit PlayerTwoMoves(msg.sender, msg.value, gameKey);
+        emit PlayerMoves(msg.sender, gameKey, msg.value);
     }
 
     function depositStake(uint256 stake) internal {
-        uint256 senderBalance = balances[msg.sender];
 
         if (msg.value == stake) {
             return;
         }
+        uint256 senderBalance = balances[msg.sender];
 
         if (msg.value < stake) {
             require(senderBalance >= stake.sub(msg.value), "Insufficient balance");
@@ -125,118 +123,118 @@ contract RockPaperScissors is Ownable, Pausable {
         } else {
             balances[msg.sender] = senderBalance.add(msg.value.sub(stake));
         }
-
-        Deposit(msg.sender, msg.value);
     }
 
-    function playerOneReveal(bytes32 gameKey, bytes32 secret, uint8 move) external whenNotPaused {
+    function revealPlayerOne(bytes32 gameKey, bytes32 secret, uint8 playerOneMove) external whenNotPaused {
 
-        require(move < 3, INVALID_MOVE_MSG);
+        require(playerOneMove < 3, INVALID_MOVE_MSG);
         Game storage game = games[gameKey];
-        uint256 stake = game.stake;
-        require(stake != 0, GAME_NOT_FOUND_MSG);
-        require(game.step == Steps.PLAYER_TWO_MOVE, INVALID_STEP_MSG);
+        require(game.step == uint8(Steps.PLAYER_TWO_MOVE), INVALID_STEP_MSG);
         address playerOne = game.playerOne;
-        require(msg.sender == playerOne, ONLY_PLAYER_ONE_CALL_MSG);
-
+        require(msg.sender == playerOne, INVALID_PLAYER_MSG);
 
         //Validate move
-        bytes32 expectedMoveHash = createGameKey(secret, move);
-        require(gameKey == expectedMoveHash, "Move and secret do not match");
+        bytes32 expectedMoveHash = createGameKey(secret, playerOneMove);
+        require(gameKey == expectedMoveHash, HASH_MISMATCH_MSG);
 
-        game.playerOneMove = move;
-        game.step = Steps.PLAYER_ONE_REVEAL;
+        game.playerOneMove = playerOneMove;
+        game.step = uint8(Steps.PLAYER_ONE_REVEAL);
+
+        emit PlayerReveals(msg.sender, gameKey, playerOneMove);
     }
 
-    /**
-    * Once the opponent has made their move, the creator of the game must resolve to determine the winner
-    * and reward the winner.
-    * If the creator does not resolve the game then the opponent can collect their winnings
-     * after the forfeit window has expired.
-    */
-    function playerTwoReveal(bytes32 gameKey, bytes32 secret, uint8 playerTwoMove) external whenNotPaused {
+    function revealplayerTwo(bytes32 gameKey, bytes32 secret, uint8 playerTwoMove) external whenNotPaused {
 
+        require(playerTwoMove < 3, INVALID_MOVE_MSG);
         Game storage game = games[gameKey];
-        uint256 stake = game.stake;
-        require(game.step == Steps.PLAYER_ONE_REVEAL, INVALID_STEP_MSG);
+        require(game.step == uint8(Steps.PLAYER_ONE_REVEAL), INVALID_STEP_MSG);
         address playerTwo = game.playerTwo;
         require(msg.sender == playerTwo, INVALID_PLAYER_MSG);
-        require(playerTwoMove < 3, INVALID_MOVE_MSG);
 
         //Validate move
-        bytes32 expectedMoveHash = createOpponentMoveHash(gameKey, secret, playerTwoMove);
-        require(game.playerTwoMoveHash == expectedMoveHash, "Move and secret do not match");
+        bytes32 expectedMoveHash = createPlayerTwoMoveHash(gameKey, secret, playerTwoMove);
+        require(game.playerTwoMoveHash == expectedMoveHash, HASH_MISMATCH_MSG);
 
+        emit PlayerReveals(msg.sender, gameKey, playerTwoMove);
+
+        uint256 stake = game.stake;
+        address playerOne = game.playerOne;
         uint8 playerOneMove = game.playerOneMove;
 
-
         //Draw
-        if(playerOneMove == playerTwoMove){
+        if (playerOneMove == playerTwoMove){
             resetGame(game);
             balances[playerOne] = balances[playerOne].add(stake);
             balances[playerTwo] = balances[playerTwo].add(stake);
-            emit Draw(gameKey);
+            DrawRefund(playerOne, playerTwo, gameKey, stake);
+
             return;
         }
 
-        //Determine winner
+        //Determine and reward winner
         address winner;
         address loser;
-        uint256 winnings = SafeMath.mul(stake, 2);
+        uint256 fee = SafeMath.mul(stake, FEE_PERCENTAGE.div(100));
 
-        // If the creator wins then is rewarded by not paying a fee on the winnings
-        if (isWinner(playerOneMove, opponentMove)) {
+        if (isWinner(playerOneMove, playerTwoMove)) {
             winner = playerOne;
             loser = playerTwo;
         } else {
             winner = playerTwo;
             loser = playerTwo;
         }
+        uint256 winnings = SafeMath.mul(stake, 2).sub(fee);
         balances[winner] = balances[winner].add(winnings);
-        resetGame(game);
+        emit GamePayment(winner, gameKey, winnings);
 
-        emit WinnerRewarded(gameKey, winner, amount);
+        balances[loser] = balances[loser].add(fee);
+        emit GamePayment(loser, gameKey, fee);
+
+        resetGame(game);
     }
 
-    function isWinner(uint8 creatorMove, uint8 opponentMove) internal pure returns (boolean) {
-        return (mod(opponentMove.add(1), 3) == creatorMove);
+    function isWinner(uint8 playerOneMove, uint8 playerTwoMove) internal pure returns (bool) {
+        return SafeMath.mod(playerTwoMove.add(1), 3) == playerOneMove;
     }
 
     /*
-    * If expiry has passed, the opponent forfeits their stake
-    * They also pay no fee as a compensation
-    * Creator punished by not getting a fee refunded that would have received if resolved
+    * If expiry has passed, and player two has not revealed then:
+    * - Player 1 pays no fee as a compensation
+    * - Player 2 is punished by not getting a fee refunded that they would have received if resolved.
+    *
+    * - If no player joins the game, then player 1 gets back their stake
     */
     function playerOneCollectsForfeit(bytes32 gameKey) whenNotPaused external whenNotPaused {
         Game storage game = games[gameKey];
-        uint256 stake = game.stake;
-        require(stake != 0, GAME_NOT_FOUND_MSG);
-        require(game.step == Steps.PLAYER_ONE_REVEAL, INVALID_STEP_MSG);
+        require(game.step <= uint8(Steps.PLAYER_ONE_REVEAL), INVALID_STEP_MSG);
+        address playerOne = game.playerOne;
         require(msg.sender == playerOne, INVALID_PLAYER_MSG);
         require(block.timestamp >= game.expiryDate, "Game has not expired");
 
-        address playerTwo = game.playerTwo;
-        uint256 forfeit = SafeMath.mul(stake, 2);
+        uint256 forfeit = SafeMath.mul(game.stake, 2);
         resetGame(game);
         balances[playerOne] = balances[playerOne].add(forfeit);
 
-        emit ForfeitPaid(opponent, gameKey, forfeit);
+        emit ForfeitPaid(playerOne, gameKey, forfeit);
     }
 
+    /*
+    * If expiry has passed, and player 1 has not revealed
+    * They pay no fee as a compensation
+    * Player 1 is punished by not getting a fee refunded that would have received if they revealed.
+    */
     function playerTwoCollectsForfeit(bytes32 gameKey) whenNotPaused external whenNotPaused {
         Game storage game = games[gameKey];
-        uint256 stake = game.stake;
-        require(stake != 0, GAME_NOT_FOUND_MSG);
-        require(game.step == Steps.PLAYER_TWO_MOVE, INVALID_STEP_MSG);
+        require(game.step == uint8(Steps.PLAYER_TWO_MOVE), INVALID_STEP_MSG);
+        address playerTwo = game.playerTwo;
         require(msg.sender == playerTwo, INVALID_PLAYER_MSG);
         require(block.timestamp >= game.expiryDate, "Game has not expired");
 
-        address playerTwo = game.playerTwo;
-        uint256 forfeit = SafeMath.mul(stake, 2);
+        uint256 forfeit = SafeMath.mul(game.stake, 2);
         resetGame(game);
         balances[playerTwo] = balances[playerTwo].add(forfeit);
 
-        emit ForfeitPaid(opponent, gameKey, forfeit);
+        emit ForfeitPaid(playerTwo, gameKey, forfeit);
     }
 
     function withdraw(uint amount) external whenNotPaused returns(bool success) {
@@ -253,14 +251,15 @@ contract RockPaperScissors is Ownable, Pausable {
 
     function resetGame(Game storage game) internal {
         game.stake = 0;
-        game.moveHash = bytes32(0);
-        game.opponentMove = 0;
+        game.playerTwoMoveHash = bytes32(0);
+        game.playerOneMove = 0;
         game.expiryDate = 0;
+        game.step = uint8(Steps.RESET);
     }
 
     // This can only be used once because it is used as a mapping key
-    function createGameKey(bytes32 secret, uint move) public view returns (bytes32) {
-        require(gameKey != bytes32(0), "Game token cannot be empty");
+    function createGameKey(bytes32 secret, uint move) public view returns(bytes32) {
+
         require(secret != bytes32(0), "Secret cannot be empty");
         require(move < 3, INVALID_MOVE_MSG);
 
@@ -268,7 +267,7 @@ contract RockPaperScissors is Ownable, Pausable {
     }
 
     // Even if the secret is reused, the hash will always be unique because the game key will be unique
-    function createOpponentMoveHash(bytes32 gameKey, bytes32 secret, uint move) public view returns (bytes32) {
+    function createPlayerTwoMoveHash(bytes32 gameKey, bytes32 secret, uint move) public view returns (bytes32) {
         require(gameKey != bytes32(0), "Game token cannot be empty");
         require(secret != bytes32(0), "Secret cannot be empty");
         require(move < 3, INVALID_MOVE_MSG);
