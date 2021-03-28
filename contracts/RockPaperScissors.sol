@@ -86,7 +86,7 @@ contract RockPaperScissors is Ownable, Pausable {
         require(moveHash != bytes32(0), "Game key cannot be empty");
         Game storage game = games[moveHash];
         require(game.step == uint8(Steps.INIT), INVALID_STEP_MSG);
-        require(game.playerOne == NULL_ADDRESS, INVALID_STEP_MSG);
+        require(game.playerOne == NULL_ADDRESS, INVALID_PLAYER_MSG);
 
         game.playerOne = msg.sender;
         game.stake = game.stake;
@@ -123,7 +123,7 @@ contract RockPaperScissors is Ownable, Pausable {
             require(senderBalance >= stake.sub(msg.value), "Insufficient balance");
             balances[msg.sender] = senderBalance.sub(stake.sub(msg.value));
         } else {
-            balances[msg.sender] = senderBalance.add(msg.value.sub(stake));
+            balances[msg.sender] = senderBalance.add(msg.value).sub(stake);
         }
     }
 
@@ -185,7 +185,7 @@ contract RockPaperScissors is Ownable, Pausable {
             winner = playerTwo;
             loser = playerOne;
         }
-        uint256 winnings = SafeMath.mul(stake, 2).sub(fee);
+        uint256 winnings = stake.mul(2).sub(fee);
         balances[winner] = balances[winner].add(winnings);
         emit GamePayment(winner, gameKey, winnings);
 
