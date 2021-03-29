@@ -22,7 +22,7 @@ contract RockPaperScissors is Ownable, Pausable {
     string private constant HASH_MISMATCH_MSG = "Move and secret do not match";
     string private constant GAME_NOT_EXPIRED_MSG = "Game has not expired";
 
-    uint256 constant FORFEIT_WINDOW = 12 hours;
+    uint256 constant FORFEIT_WINDOW = 24 hours;
     uint256 constant FEE_PERCENTAGE = 10;
 
     enum Steps {
@@ -91,7 +91,6 @@ contract RockPaperScissors is Ownable, Pausable {
         game.playerOne = msg.sender;
         game.stake = game.stake;
         game.step = uint8(Steps.PLAYER_ONE_MOVE);
-        game.expiryDate = block.timestamp + FORFEIT_WINDOW;
         depositStake(stake);
 
         emit PlayerMoves(msg.sender, moveHash, stake);
@@ -107,6 +106,7 @@ contract RockPaperScissors is Ownable, Pausable {
         game.playerTwo = msg.sender;
         game.playerTwoMoveHash = moveHash;
         game.step = uint8(Steps.PLAYER_TWO_MOVE);
+        game.expiryDate = block.timestamp + FORFEIT_WINDOW;
         depositStake(game.stake);
 
         emit PlayerMoves(msg.sender, gameKey, msg.value);
@@ -137,6 +137,7 @@ contract RockPaperScissors is Ownable, Pausable {
 
         game.playerOneMove = playerOneMove;
         game.step = uint8(Steps.PLAYER_ONE_REVEAL);
+        game.expiryDate = block.timestamp + FORFEIT_WINDOW;
 
         emit PlayerReveals(msg.sender, gameKey, playerOneMove);
     }
@@ -172,7 +173,7 @@ contract RockPaperScissors is Ownable, Pausable {
         //Determine and reward winner
         address winner;
         address loser;
-        uint256 fee = SafeMath.mul(stake, FEE_PERCENTAGE.div(100));
+        uint256 fee = stake.mul(FEE_PERCENTAGE.div(100));
 
         if (isWinner(playerOneMove, playerTwoMove)) {
             winner = playerOne;
@@ -196,7 +197,7 @@ contract RockPaperScissors is Ownable, Pausable {
     }
 
     /*
-    * If expiry has passed, and player two has not revealed then:
+    * If expiry has passed, and player 2 has not revealed then:
     * - Player 1 pays no fee as a compensation
     * - Player 2 is punished by not getting a fee refunded that they would have received if resolved.
     *
@@ -210,7 +211,7 @@ contract RockPaperScissors is Ownable, Pausable {
 
         require(block.timestamp >= game.expiryDate, GAME_NOT_EXPIRED_MSG);
 
-        uint256 forfeit = SafeMath.mul(game.stake, 2);
+        uint256 forfeit = game.stake.mul(2);
         resetGame(game);
         balances[playerOne] = balances[playerOne].add(forfeit);
 
@@ -230,7 +231,7 @@ contract RockPaperScissors is Ownable, Pausable {
         require(msg.sender == playerTwo, INVALID_PLAYER_MSG);
         require(block.timestamp >= game.expiryDate, GAME_NOT_EXPIRED_MSG);
 
-        uint256 forfeit = SafeMath.mul(game.stake, 2);
+        uint256 forfeit = game.stake.mul(2);
         resetGame(game);
         balances[playerTwo] = balances[playerTwo].add(forfeit);
 
