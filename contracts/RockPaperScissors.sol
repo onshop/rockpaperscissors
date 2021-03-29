@@ -127,17 +127,13 @@ contract RockPaperScissors is Ownable, Pausable {
         }
     }
 
-    function revealPlayerOne(bytes32 gameKey, bytes32 secret, uint8 playerOneMove) external whenNotPaused {
+    function revealPlayerOne(bytes32 secret, uint8 playerOneMove) external whenNotPaused {
 
-        require(playerOneMove < 3, INVALID_MOVE_MSG);
+        bytes32 gameKey = createPlayerOneMoveHash(secret, playerOneMove);
         Game storage game = games[gameKey];
         require(game.step == uint8(Steps.PLAYER_TWO_MOVE), INVALID_STEP_MSG);
         address playerOne = game.playerOne;
         require(msg.sender == playerOne, INVALID_PLAYER_MSG);
-
-        //Validate move
-        bytes32 expectedMoveHash = createPlayerOneMoveHash(secret, playerOneMove);
-        require(gameKey == expectedMoveHash, HASH_MISMATCH_MSG);
 
         game.playerOneMove = playerOneMove;
         game.step = uint8(Steps.PLAYER_ONE_REVEAL);
@@ -211,6 +207,7 @@ contract RockPaperScissors is Ownable, Pausable {
         require(game.step <= uint8(Steps.PLAYER_ONE_REVEAL), INVALID_STEP_MSG);
         address playerOne = game.playerOne;
         require(msg.sender == playerOne, INVALID_PLAYER_MSG);
+
         require(block.timestamp >= game.expiryDate, GAME_NOT_EXPIRED_MSG);
 
         uint256 forfeit = SafeMath.mul(game.stake, 2);
@@ -226,6 +223,7 @@ contract RockPaperScissors is Ownable, Pausable {
     * Player 1 is punished by not getting a fee refunded that would have received if they revealed.
     */
     function playerTwoCollectsForfeit(bytes32 gameKey) whenNotPaused external whenNotPaused {
+
         Game storage game = games[gameKey];
         require(game.step == uint8(Steps.PLAYER_TWO_MOVE), INVALID_STEP_MSG);
         address playerTwo = game.playerTwo;
@@ -237,6 +235,19 @@ contract RockPaperScissors is Ownable, Pausable {
         balances[playerTwo] = balances[playerTwo].add(forfeit);
 
         emit ForfeitPaid(playerTwo, gameKey, forfeit);
+    }
+
+    function playerOneTerminates(bytes32 gameKey) whenNotPaused external whenNotPaused {
+
+        Game storage game = games[gameKey];
+        require(game.step == uint8(Steps.PLAYER_ONE_MOVE), INVALID_STEP_MSG);
+        address playerOne = game.playerOne;
+        require(msg.sender == playerOne, INVALID_PLAYER_MSG);
+
+        resetGame(game);
+        balances[playerOne] = balances[playerOne].add(game.stake);
+
+        emit (playerOne, gameKey, forfeit);
     }
 
     function withdraw(uint amount) external whenNotPaused returns(bool success) {
