@@ -8,7 +8,8 @@
   },
   "dependencies": {
     "-": "0.0.1",
-    "@openzeppelin/contracts": "^3.3.0"
+    "@openzeppelin/contracts": "^3.3.0",
+    "ganache-time-traveler": "^1.0.15"
   },
   "scripts": {
     "test": "test"
