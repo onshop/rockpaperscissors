@@ -21,36 +21,53 @@ contract RockPaperScissors is Ownable, Pausable {
     string private constant INVALID_STEP_MSG = "Invalid step";
     string private constant HASH_MISMATCH_MSG = "Move and secret do not match";
     string private constant GAME_NOT_EXPIRED_MSG = "Game has not expired";
+    string private constant MOVE_HASH_EMPTY_MSG = "Move hash is empty";
 
-    uint256 constant FORFEIT_WINDOW = 24 hours;
+    uint256 constant FORFEIT_WINDOW = 1 days;
     uint256 constant FEE_PERCENTAGE = 10;
 
     enum Steps {
-        INIT,
-        PLAYER_ONE_MOVE,
-        PLAYER_TWO_MOVE,
-        PLAYER_ONE_REVEAL,
-        PLAYER_TWO_REVEAL,
-        RESET
+        INIT, // 0
+        PLAYER_ONE_MOVE, // 1
+        PLAYER_TWO_MOVE, // 2
+        PLAYER_ONE_REVEAL // 3
     }
+
+    Steps public steps;
 
     struct Game {
         uint256 stake;
+        uint256 expiryDate;
         address playerOne;
         address playerTwo;
-        bytes32 playerTwoMoveHash;
         uint8 playerOneMove;
-        uint256 expiryDate;
         uint8 step;
+        bytes32 playerTwoMoveHash;
     }
 
-    event PlayerMoves(
+    event PlayerOneMoves(
         address indexed player,
         bytes32 indexed gameKey,
-        uint256 value
+        uint256 stake,
+        uint256 amount
     );
 
-    event PlayerReveals(
+    event PlayerTwoMoves(
+        address indexed player,
+        uint256 amount,
+        bytes32 indexed gameKey,
+        bytes32 moveHash,
+        uint256 expiryDate
+    );
+
+    event PlayerOneReveals(
+        address indexed player,
+        bytes32 indexed gameKey,
+        uint8 move,
+        uint256 expiryDate
+    );
+
+    event PlayerTwoReveals(
         address indexed player,
         bytes32 indexed gameKey,
         uint8 move
@@ -77,46 +94,46 @@ contract RockPaperScissors is Ownable, Pausable {
     );
 
     event WithDraw(
-        address indexed withdrawer,
+        address indexed player,
         uint amount
     );
 
     event PlayerOneEndsGame(
         address indexed player,
         bytes32 indexed gameKey,
-        uint256 refund
+        uint256 amount
     );
 
     // The creator's move is embedded in the game key
-    function movePlayerOne(bytes32 moveHash, uint stake) external payable whenNotPaused {
+    function movePlayerOne(bytes32 moveHash, uint256 stake) external payable whenNotPaused {
 
-        require(moveHash != bytes32(0), "Game key cannot be empty");
+        require(moveHash != bytes32(0), "Move hash is empty");
         Game storage game = games[moveHash];
         require(game.step == uint8(Steps.INIT), INVALID_STEP_MSG);
-        require(game.playerOne == NULL_ADDRESS, INVALID_PLAYER_MSG);
+        require(game.playerOne == NULL_ADDRESS, INVALID_MOVE_MSG);
 
+        game.stake = stake;
         game.playerOne = msg.sender;
-        game.stake = game.stake;
         game.step = uint8(Steps.PLAYER_ONE_MOVE);
         depositStake(stake);
 
-        emit PlayerMoves(msg.sender, moveHash, stake);
+        emit PlayerOneMoves(msg.sender, moveHash, stake, msg.value);
     }
 
     function movePlayerTwo(bytes32 gameKey, bytes32 moveHash) external payable whenNotPaused {
 
-        require(moveHash != bytes32(0), "Game key cannot be empty");
+        require(moveHash != bytes32(0), "Move hash is empty");
         Game storage game = games[gameKey];
         require(game.step == uint8(Steps.PLAYER_ONE_MOVE), INVALID_STEP_MSG);
-        require(game.playerTwo == NULL_ADDRESS, INVALID_STEP_MSG);
 
+        uint256 expiryDate = block.timestamp.add(FORFEIT_WINDOW);
         game.playerTwo = msg.sender;
         game.playerTwoMoveHash = moveHash;
         game.step = uint8(Steps.PLAYER_TWO_MOVE);
-        game.expiryDate = block.timestamp + FORFEIT_WINDOW;
+        game.expiryDate = expiryDate;
         depositStake(game.stake);
 
-        emit PlayerMoves(msg.sender, gameKey, msg.value);
+        emit PlayerTwoMoves(msg.sender, msg.value, gameKey, moveHash, expiryDate);
     }
 
     function depositStake(uint256 stake) internal {
@@ -142,11 +159,12 @@ contract RockPaperScissors is Ownable, Pausable {
         address playerOne = game.playerOne;
         require(msg.sender == playerOne, INVALID_PLAYER_MSG);
 
+        uint256 expiryDate = block.timestamp.add(FORFEIT_WINDOW);
         game.playerOneMove = playerOneMove;
         game.step = uint8(Steps.PLAYER_ONE_REVEAL);
-        game.expiryDate = block.timestamp + FORFEIT_WINDOW;
+        game.expiryDate = expiryDate;
 
-        emit PlayerReveals(msg.sender, gameKey, playerOneMove);
+        emit PlayerOneReveals(msg.sender, gameKey, playerOneMove, expiryDate);
     }
 
     function revealPlayerTwo(bytes32 gameKey, bytes32 secret, uint8 playerTwoMove) external whenNotPaused {
@@ -160,7 +178,7 @@ contract RockPaperScissors is Ownable, Pausable {
         bytes32 expectedMoveHash = createPlayerTwoMoveHash(gameKey, secret, playerTwoMove);
         require(game.playerTwoMoveHash == expectedMoveHash, HASH_MISMATCH_MSG);
 
-        emit PlayerReveals(msg.sender, gameKey, playerTwoMove);
+        emit PlayerTwoReveals(msg.sender, gameKey, playerTwoMove);
 
         uint256 stake = game.stake;
         address playerOne = game.playerOne;
@@ -179,7 +197,6 @@ contract RockPaperScissors is Ownable, Pausable {
         //Determine and reward winner
         address winner;
         address loser;
-        uint256 fee = stake.mul(FEE_PERCENTAGE.div(100));
 
         if (isWinner(playerOneMove, playerTwoMove)) {
             winner = playerOne;
@@ -188,6 +205,7 @@ contract RockPaperScissors is Ownable, Pausable {
             winner = playerTwo;
             loser = playerOne;
         }
+        uint256 fee = stake.mul(FEE_PERCENTAGE).div(100);
         uint256 winnings = stake.mul(2).sub(fee);
         balances[winner] = balances[winner].add(winnings);
         emit GamePayment(winner, gameKey, winnings);
@@ -270,12 +288,14 @@ contract RockPaperScissors is Ownable, Pausable {
         require(success, "Transfer failed");
     }
 
+    // We don't want to delete the struct so the key cannot be reused
     function resetGame(Game storage game) internal {
         game.stake = 0;
+        game.playerTwo = address(0);
         game.playerTwoMoveHash = bytes32(0);
         game.playerOneMove = 0;
         game.expiryDate = 0;
-        game.step = uint8(Steps.RESET);
+        game.step = 0;
     }
 
     // This can only be used once because it is used as a mapping key
