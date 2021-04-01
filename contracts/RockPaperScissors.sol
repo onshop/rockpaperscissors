@@ -71,7 +71,7 @@ contract RockPaperScissors is Ownable, Pausable {
         uint256 move
     );
 
-    event  DrawRefund(
+    event DrawRefund(
         address indexed playerOne,
         address indexed playerTwo,
         bytes32 indexed gameKey,
@@ -85,7 +85,7 @@ contract RockPaperScissors is Ownable, Pausable {
         uint256 amount
     );
 
-    event  ForfeitPaid(
+    event ForfeitPaid(
         address indexed player,
         bytes32 indexed gameKey,
         uint256 amount
