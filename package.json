@@ -15,6 +15,9 @@
     "enableTimeouts": false,
     "before_timeout": 120000
   },
+  "scripts": {
+    "test": "test"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/onshop/rockpaperscissors.git"
