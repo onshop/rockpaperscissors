@@ -8,7 +8,6 @@ import {SafeMath} from "./math/SafeMath.sol";
 
 contract RockPaperScissors is Ownable, Pausable {
 
-    using SafeMath for uint8;
     using SafeMath for uint256;
 
     mapping(address => uint256) public balances;
@@ -16,12 +15,11 @@ contract RockPaperScissors is Ownable, Pausable {
 
     address private constant NULL_ADDRESS = address(0);
     string private constant INVALID_PLAYER_MSG = "Invalid player";
-    string private constant GAME_NOT_FOUND_MSG = "Game not found";
     string private constant INVALID_MOVE_MSG = "Invalid move";
     string private constant INVALID_STEP_MSG = "Invalid step";
     string private constant HASH_MISMATCH_MSG = "Move and secret do not match";
     string private constant GAME_NOT_EXPIRED_MSG = "Game has not expired";
-    string private constant MOVE_HASH_EMPTY_MSG = "Move hash is empty";
+    string private constant SECRET_EMPTY_MSG = "Secret is empty";
 
     uint256 constant FORFEIT_WINDOW = 1 days;
     uint256 constant FEE_PERCENTAGE = 10;
@@ -38,10 +36,10 @@ contract RockPaperScissors is Ownable, Pausable {
     struct Game {
         uint256 stake;
         uint256 expiryDate;
+        uint256 playerOneMove;
+        uint256 step;
         address playerOne;
         address playerTwo;
-        uint8 playerOneMove;
-        uint8 step;
         bytes32 playerTwoMoveHash;
     }
 
@@ -63,14 +61,14 @@ contract RockPaperScissors is Ownable, Pausable {
     event PlayerOneReveals(
         address indexed player,
         bytes32 indexed gameKey,
-        uint8 move,
+        uint256 move,
         uint256 expiryDate
     );
 
     event PlayerTwoReveals(
         address indexed player,
         bytes32 indexed gameKey,
-        uint8 move
+        uint256 move
     );
 
     event  DrawRefund(
@@ -109,12 +107,12 @@ contract RockPaperScissors is Ownable, Pausable {
 
         require(moveHash != bytes32(0), "Move hash is empty");
         Game storage game = games[moveHash];
-        require(game.step == uint8(Steps.INIT), INVALID_STEP_MSG);
+        require(game.step == uint256(Steps.INIT), INVALID_STEP_MSG);
         require(game.playerOne == NULL_ADDRESS, INVALID_MOVE_MSG);
 
         game.stake = stake;
         game.playerOne = msg.sender;
-        game.step = uint8(Steps.PLAYER_ONE_MOVE);
+        game.step = uint256(Steps.PLAYER_ONE_MOVE);
         depositStake(stake);
 
         emit PlayerOneMoves(msg.sender, moveHash, stake, msg.value);
@@ -124,12 +122,12 @@ contract RockPaperScissors is Ownable, Pausable {
 
         require(moveHash != bytes32(0), "Move hash is empty");
         Game storage game = games[gameKey];
-        require(game.step == uint8(Steps.PLAYER_ONE_MOVE), INVALID_STEP_MSG);
+        require(game.step == uint256(Steps.PLAYER_ONE_MOVE), INVALID_STEP_MSG);
 
         uint256 expiryDate = block.timestamp.add(FORFEIT_WINDOW);
         game.playerTwo = msg.sender;
         game.playerTwoMoveHash = moveHash;
-        game.step = uint8(Steps.PLAYER_TWO_MOVE);
+        game.step = uint256(Steps.PLAYER_TWO_MOVE);
         game.expiryDate = expiryDate;
         depositStake(game.stake);
 
@@ -151,24 +149,24 @@ contract RockPaperScissors is Ownable, Pausable {
         }
     }
 
-    function revealPlayerOne(bytes32 secret, uint8 playerOneMove) external whenNotPaused {
+    function revealPlayerOne(bytes32 secret, uint256 playerOneMove) external whenNotPaused {
 
         bytes32 gameKey = createPlayerOneMoveHash(secret, playerOneMove);
         Game storage game = games[gameKey];
-        require(game.step == uint8(Steps.PLAYER_TWO_MOVE), INVALID_STEP_MSG);
+        require(game.step == uint256(Steps.PLAYER_TWO_MOVE), INVALID_STEP_MSG);
 
         uint256 expiryDate = block.timestamp.add(FORFEIT_WINDOW);
         game.playerOneMove = playerOneMove;
-        game.step = uint8(Steps.PLAYER_ONE_REVEAL);
+        game.step = uint256(Steps.PLAYER_ONE_REVEAL);
         game.expiryDate = expiryDate;
 
         emit PlayerOneReveals(msg.sender, gameKey, playerOneMove, expiryDate);
     }
 
-    function revealPlayerTwo(bytes32 gameKey, bytes32 secret, uint8 playerTwoMove) external whenNotPaused {
+    function revealPlayerTwo(bytes32 gameKey, bytes32 secret, uint256 playerTwoMove) external whenNotPaused {
 
         Game storage game = games[gameKey];
-        require(game.step == uint8(Steps.PLAYER_ONE_REVEAL), INVALID_STEP_MSG);
+        require(game.step == uint256(Steps.PLAYER_ONE_REVEAL), INVALID_STEP_MSG);
         address playerTwo = game.playerTwo;
 
         //Validate move
@@ -179,7 +177,7 @@ contract RockPaperScissors is Ownable, Pausable {
 
         uint256 stake = game.stake;
         address playerOne = game.playerOne;
-        uint8 playerOneMove = game.playerOneMove;
+        uint256 playerOneMove = game.playerOneMove;
 
         //Draw
         if (playerOneMove == playerTwoMove){
@@ -213,20 +211,21 @@ contract RockPaperScissors is Ownable, Pausable {
         resetGame(game);
     }
 
-    function isWinner(uint8 playerOneMove, uint8 playerTwoMove) public pure returns (bool) {
+    function isWinner(uint256 playerOneMove, uint256 playerTwoMove) public pure returns (bool) {
         return SafeMath.mod(playerTwoMove.add(1), 3) == playerOneMove;
     }
 
     /*
     * If expiry has passed, and player 2 has not revealed then:
     * - Player 1 pays no fee as a compensation
-    * - Player 2 is punished by not getting a fee refunded that they would have received if resolved.
+    * - Player 2 is disincentivised by not getting a fee refunded that they would have received if resolved.
     *
     * - If no player joins the game, then player 1 gets back their stake
     */
     function playerOneCollectsForfeit(bytes32 gameKey) whenNotPaused external whenNotPaused {
+
         Game storage game = games[gameKey];
-        require(game.step <= uint8(Steps.PLAYER_ONE_REVEAL), INVALID_STEP_MSG);
+        require(game.step == uint256(Steps.PLAYER_ONE_REVEAL), INVALID_STEP_MSG);
         address playerOne = game.playerOne;
         require(msg.sender == playerOne, INVALID_PLAYER_MSG);
 
@@ -242,12 +241,12 @@ contract RockPaperScissors is Ownable, Pausable {
     /*
     * If expiry has passed, and player 1 has not revealed
     * They pay no fee as a compensation
-    * Player 1 is punished by not getting a fee refunded that would have received if they revealed.
+    * Player 1 is disincentivised by not getting a fee refunded that would have received if they revealed.
     */
     function playerTwoCollectsForfeit(bytes32 gameKey) whenNotPaused external whenNotPaused {
 
         Game storage game = games[gameKey];
-        require(game.step == uint8(Steps.PLAYER_TWO_MOVE), INVALID_STEP_MSG);
+        require(game.step == uint256(Steps.PLAYER_TWO_MOVE), INVALID_STEP_MSG);
         address playerTwo = game.playerTwo;
         require(msg.sender == playerTwo, INVALID_PLAYER_MSG);
         require(block.timestamp >= game.expiryDate, GAME_NOT_EXPIRED_MSG);
@@ -262,7 +261,7 @@ contract RockPaperScissors is Ownable, Pausable {
     function playerOneEndsGame(bytes32 gameKey) whenNotPaused external whenNotPaused {
 
         Game storage game = games[gameKey];
-        require(game.step == uint8(Steps.PLAYER_ONE_MOVE), INVALID_STEP_MSG);
+        require(game.step == uint256(Steps.PLAYER_ONE_MOVE), INVALID_STEP_MSG);
         address playerOne = game.playerOne;
         require(msg.sender == playerOne, INVALID_PLAYER_MSG);
 
@@ -274,6 +273,7 @@ contract RockPaperScissors is Ownable, Pausable {
     }
 
     function withdraw(uint amount) external whenNotPaused returns(bool success) {
+
         uint256 withdrawerBalance = balances[msg.sender];
         require(amount > 0, "The value must be greater than 0");
         require(withdrawerBalance >= amount, "There are insufficient funds");
@@ -287,6 +287,7 @@ contract RockPaperScissors is Ownable, Pausable {
 
     // We don't want to delete the struct so the key cannot be reused
     function resetGame(Game storage game) internal {
+
         game.stake = 0;
         game.playerTwo = address(0);
         game.playerTwoMoveHash = bytes32(0);
@@ -298,7 +299,7 @@ contract RockPaperScissors is Ownable, Pausable {
     // This can only be used once because it is used as a mapping key
     function createPlayerOneMoveHash(bytes32 secret, uint move) public view returns(bytes32) {
 
-        require(secret != bytes32(0), "Secret cannot be empty");
+        require(secret != bytes32(0), SECRET_EMPTY_MSG);
         require(move < 3, INVALID_MOVE_MSG);
 
         return keccak256(abi.encodePacked(msg.sender, secret, move));
@@ -308,7 +309,7 @@ contract RockPaperScissors is Ownable, Pausable {
     function createPlayerTwoMoveHash(bytes32 gameKey, bytes32 secret, uint move) public view returns (bytes32) {
 
         require(gameKey != bytes32(0), "Game key cannot be empty");
-        require(secret != bytes32(0), "Secret cannot be empty");
+        require(secret != bytes32(0), SECRET_EMPTY_MSG);
         require(move < 3, INVALID_MOVE_MSG);
 
         return keccak256(abi.encodePacked(msg.sender, gameKey, secret, move));
