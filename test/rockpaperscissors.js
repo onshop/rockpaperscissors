@@ -292,13 +292,10 @@ contract('rcp', async accounts => {
 
     });
 
-    it("Player ends the game early, collects the stake and withdraws their balance", async () => {
+    it("Player ends the game early and collects their stake", async () => {
 
         await rcp.movePlayerOne(gameKey, toBN(10), {from: playerOne, value: toBN(10)});
-
         const txObj = await rcp.playerOneEndsGame(gameKey, {from: playerOne});
-
-        const initPlayerOneEthBalance = toBN(await getBalance(playerOne));
 
         await truffleAssert.eventEmitted(txObj, 'PlayerOneEndsGame', (ev) => {
 
@@ -310,24 +307,32 @@ contract('rcp', async accounts => {
         const playerOneOwed = await rcp.balances(playerOne);
         assert.strictEqual(playerOneOwed.toString(10), "10");
 
-        // Recipient withdraws
-        const txObj2 = await rcp.withdraw(toBN(5), {from: playerOne});
+    });
 
-        await truffleAssert.eventEmitted(txObj2, 'WithDraw', (ev) => {
+
+    it("Player ends the game early, collects their stake and withdraws their balance", async () => {
+
+        await rcp.movePlayerOne(gameKey, toBN(10), {from: playerOne, value: toBN(10)});
+        await rcp.playerOneEndsGame(gameKey, {from: playerOne});
+
+        const initPlayerOneEthBalance = toBN(await getBalance(playerOne));
+
+        const txObj = await rcp.withdraw(toBN(5), {from: playerOne});
+
+        await truffleAssert.eventEmitted(txObj, 'WithDraw', (ev) => {
 
             return  ev.player === playerOne &&
-                    ev.amount.toString(10) === "5"
+                ev.amount.toString(10) === "5"
         },'WithDraw event is emitted');
 
-        const cost = await getGasCost(txObj2);
+        const cost = await getGasCost(txObj);
 
-        // Get the player one's ETH and contract balances
         const playerOneEthBalance = toBN(await getBalance(playerOne));
-        const playerOneOwed2 = toBN(await rcp.balances(playerOne));
+        const playerOneOwed = toBN(await rcp.balances(playerOne));
         const expectedPlayerOneEthBalance = initPlayerOneEthBalance.add(toBN(5)).sub(cost).toString(10);
 
         assert.strictEqual(playerOneEthBalance.toString(10), expectedPlayerOneEthBalance);
-        assert.strictEqual(playerOneOwed2.toString(10), "5");
+        assert.strictEqual(playerOneOwed.toString(10), "5");
 
     });
 
