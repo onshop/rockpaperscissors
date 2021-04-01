@@ -5,7 +5,7 @@ const Game = artifacts.require("./RockPaperScissors.sol");
 contract('rcp', async accounts => {
 
     const { toBN, soliditySha3, asciiToHex } = web3.utils;
-    const { getBalance } = web3.eth;
+    const { getBalance, getTransaction } = web3.eth;
     const playerOneSecretString = "secret1";
     const playerTwoSecretString = "secret2";
     const wrongSecretString = "wrongSecret";
@@ -19,24 +19,13 @@ contract('rcp', async accounts => {
     const PLAYER_TWO_MOVE = "2";
     const PLAYER_ONE_REVEAL = "3";
 
-    const INVALID_PLAYER_MSG = "Invalid player";
-    const GAME_NOT_FOUND_MSG = "Game not found";
+
     const INVALID_MOVE_MSG = "Invalid move";
     const INVALID_STEP_MSG = "Invalid step";
     const HASH_MISMATCH_MSG = "Move and secret do not match";
     const GAME_NOT_EXPIRED_MSG = "Game has not expired";
     const MOVE_HASH_EMPTY_MSG = "Move hash is empty";
 
-    const noStakeToWithdrawMsg = "No stake to withdraw";
-    const badMatchMsg = "Move and secret do not match";
-    const alreadyMovedMsg = "Already moved";
-    const invalidPlayerMsg = "Invalid player";
-    const gameNotFoundMsg = "Game not found";
-    const gameInProgressMsg = "Game in progress";
-
-    const emptySecretMsg = "Secret cannot be empty";
-    const emptyHashErrorMsg = "Hash cannot be empty";
-    const noFundsAvailableMsg = "No funds available";
 
     const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
     const ZERO_BYTES_32 = "0x0000000000000000000000000000000000000000000000000000000000000000";
@@ -44,7 +33,7 @@ contract('rcp', async accounts => {
 
     const getBlockTimeStamp = async(txObj) => {
 
-        const tx = await web3.eth.getTransaction(txObj.tx);
+        const tx = await getTransaction(txObj.tx);
         const blockData = await web3.eth.getBlock(tx.blockNumber)
 
         return blockData.timestamp
@@ -59,12 +48,12 @@ contract('rcp', async accounts => {
     };
 
     const getGasCost = async txObj => {
-        const tx = await web3.eth.getTransaction(txObj.tx);
+        const tx = await getTransaction(txObj.tx);
 
         return toBN(txObj.receipt.gasUsed).mul(toBN(tx.gasPrice));
     };
 
-    const [contractOwner, playerOne, playerTwo] = accounts;
+    const [contractOwner, playerOne, playerTwo, playerThree] = accounts;
     const playerOneSecretBytes32 = await soliditySha3(playerOneSecretString);
     const playerTwoSecretBytes32 = await soliditySha3(playerTwoSecretString);
     const zeroPassBytes32 = await asciiToHex("");
@@ -90,7 +79,6 @@ contract('rcp', async accounts => {
     afterEach(async() => {
         await timeMachine.revertToSnapshot(snapshotId);
     });
-
 
     it("createPlayerOneMoveHash() hashes the player's address, secret and move", async () => {
         const expectedMoveHash =  await soliditySha3(playerOne, playerOneSecretBytes32, 0);
@@ -278,7 +266,7 @@ contract('rcp', async accounts => {
         const initPlayerTwoOwed = await rcp.balances(playerTwo);
         assert.strictEqual(initPlayerTwoOwed.toString(10), "19");
 
-        const playerMoveHash = await rcp.createPlayerOneMoveHash(playerOneSecretBytes32, ROCK, {from: playerOne});
+        const playerMoveHash = await rcp.createPlayerOneMoveHash(playerOneSecretBytes32, ROCK, {from: playerTwo});
         await rcp.movePlayerOne(playerMoveHash, toBN(10), {from: playerTwo});
 
         const playerTwoOwed = await rcp.balances(playerTwo);
@@ -292,7 +280,7 @@ contract('rcp', async accounts => {
 
         const txObj = await rcp.playerOneEndsGame(gameKey, {from: playerOne});
 
-        const initPlayerOneEthBalance = toBN(await web3.eth.getBalance(playerOne));
+        const initPlayerOneEthBalance = toBN(await getBalance(playerOne));
 
         await truffleAssert.eventEmitted(txObj, 'PlayerOneEndsGame', (ev) => {
 
@@ -316,7 +304,7 @@ contract('rcp', async accounts => {
         const cost = await getGasCost(txObj2);
 
         // Get the player one's ETH and contract balances
-        const playerOneEthBalance = toBN(await web3.eth.getBalance(playerOne));
+        const playerOneEthBalance = toBN(await getBalance(playerOne));
         const playerOneOwed2 = toBN(await rcp.balances(playerOne));
         const expectedPlayerOneEthBalance = initPlayerOneEthBalance.add(toBN(5)).sub(cost).toString(10);
 
@@ -401,5 +389,77 @@ contract('rcp', async accounts => {
         checkEventNotEmitted();
     });
 
-    
+    it("Game reverts when player two moves with insufficient funds", async () => {
+        await rcp.movePlayerOne(playerOneMoveHash, toBN(10), {from: playerOne, value: toBN(10)});
+        await truffleAssert.reverts(
+            rcp.movePlayerTwo(gameKey, playerTwoMoveHash, {from: playerTwo, value: toBN(9)}),
+            "Insufficient balance"
+        );
+        checkEventNotEmitted();
+    });
+    it("Game reverts when an invalid address calls player one reveal", async () => {
+        await rcp.movePlayerOne(playerOneMoveHash, toBN(10), {from: playerOne, value: toBN(10)});
+        await rcp.movePlayerTwo(gameKey, playerTwoMoveHash, {from: playerTwo, value: toBN(10)});
+        await truffleAssert.reverts(
+            rcp.revealPlayerOne(playerOneSecretBytes32, ROCK, {from: playerThree}),
+            INVALID_STEP_MSG
+        );
+        checkEventNotEmitted();
+    });
+
+    it("Game reverts when an invalid secret is used for the player one reveal", async () => {
+        await rcp.movePlayerOne(playerOneMoveHash, toBN(10), {from: playerOne, value: toBN(10)});
+        await rcp.movePlayerTwo(gameKey, playerTwoMoveHash, {from: playerTwo, value: toBN(10)});
+        await truffleAssert.reverts(
+            rcp.revealPlayerOne(playerTwoSecretBytes32, ROCK, {from: playerOne}),
+            INVALID_STEP_MSG
+        );
+        checkEventNotEmitted();
+    });
+
+    it("Game reverts when the invalid move is used for the player one reveal", async () => {
+        await rcp.movePlayerOne(playerOneMoveHash, toBN(10), {from: playerOne, value: toBN(10)});
+        await rcp.movePlayerTwo(gameKey, playerTwoMoveHash, {from: playerTwo, value: toBN(10)});
+        await truffleAssert.reverts(
+            rcp.revealPlayerOne(playerTwoSecretBytes32, SCISSORS, {from: playerOne}),
+            INVALID_STEP_MSG
+        );
+        checkEventNotEmitted();
+    });
+
+    it("Game reverts when an invalid address calls player two reveal", async () => {
+        await rcp.movePlayerOne(playerOneMoveHash, toBN(10), {from: playerOne, value: toBN(10)});
+        await rcp.movePlayerTwo(gameKey, playerTwoMoveHash, {from: playerTwo, value: toBN(10)});
+        await rcp.revealPlayerOne(playerOneSecretBytes32, ROCK, {from: playerOne});
+
+        await truffleAssert.reverts(
+            rcp.revealPlayerTwo(gameKey, playerTwoSecretBytes32, PAPER, {from: playerThree}),
+            HASH_MISMATCH_MSG
+        );
+        checkEventNotEmitted();
+    });
+
+    it("Game reverts when an invalid secret is used for the player one reveal", async () => {
+        await rcp.movePlayerOne(playerOneMoveHash, toBN(10), {from: playerOne, value: toBN(10)});
+        await rcp.movePlayerTwo(gameKey, playerTwoMoveHash, {from: playerTwo, value: toBN(10)});
+        await rcp.revealPlayerOne(playerOneSecretBytes32, ROCK, {from: playerOne});
+
+        await truffleAssert.reverts(
+            rcp.revealPlayerTwo(gameKey, playerOneSecretBytes32, PAPER, {from: playerTwo}),
+            HASH_MISMATCH_MSG
+        );
+        checkEventNotEmitted();
+    });
+
+    it("Game reverts when the invalid move is used for the player one reveal", async () => {
+        await rcp.movePlayerOne(playerOneMoveHash, toBN(10), {from: playerOne, value: toBN(10)});
+        await rcp.movePlayerTwo(gameKey, playerTwoMoveHash, {from: playerTwo, value: toBN(10)});
+        await rcp.revealPlayerOne(playerOneSecretBytes32, ROCK, {from: playerOne});
+
+        await truffleAssert.reverts(
+            rcp.revealPlayerTwo(gameKey, playerOneSecretBytes32, SCISSORS, {from: playerTwo}),
+            HASH_MISMATCH_MSG
+        );
+        checkEventNotEmitted();
+    });
 });
