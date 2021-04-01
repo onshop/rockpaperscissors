@@ -11,8 +11,9 @@
     "@openzeppelin/contracts": "^3.3.0",
     "ganache-time-traveler": "^1.0.15"
   },
-  "scripts": {
-    "test": "test"
+  "mocha": {
+    "enableTimeouts": false,
+    "before_timeout": 120000
   },
   "repository": {
     "type": "git",
