@@ -145,14 +145,13 @@ contract RockPaperScissors is Ownable, Pausable {
         if (msg.value == stake) {
             return;
         }
-        uint256 senderBalance = balances[msg.sender];
 
+        uint256 senderBalance = balances[msg.sender];
         if (msg.value < stake) {
             require(senderBalance >= stake.sub(msg.value), "Insufficient balance");
-            balances[msg.sender] = senderBalance.sub(stake.sub(msg.value));
-        } else {
-            balances[msg.sender] = senderBalance.add(msg.value).sub(stake);
         }
+
+        balances[msg.sender] = senderBalance.add(msg.value).sub(stake);
     }
 
     function revealPlayerOne(bytes32 secret, uint256 playerOneMove) external whenNotPaused {

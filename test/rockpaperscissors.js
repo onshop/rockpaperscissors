@@ -35,7 +35,7 @@ contract('rcp', async accounts => {
     const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
     const ZERO_BYTES_32 = "0x0000000000000000000000000000000000000000000000000000000000000000";
     const DAY_24_HOUR_IN_SECS = 86400;
-    const TIMEOUT = 2500000
+    const TIMEOUT = 3000000
 
     const getBlockTimeStamp = async(txObj) => {
 
@@ -570,7 +570,8 @@ contract('rcp', async accounts => {
                 GAME_NOT_EXPIRED_MSG
             );
             checkEventNotEmitted();
-        });
+
+        }).timeout(TIMEOUT);
 
         it("Call reverts when player two collects forfeit after player one reveals", async () => {
 
