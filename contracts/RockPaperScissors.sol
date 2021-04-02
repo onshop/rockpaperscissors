@@ -151,7 +151,8 @@ contract RockPaperScissors is Ownable, Pausable {
 
     function revealPlayerOne(bytes32 secret, uint256 playerOneMove) external whenNotPaused {
 
-        bytes32 gameKey = createPlayerOneMoveHash(secret, playerOneMove);
+        require(playerOneMove < 3, INVALID_MOVE_MSG);
+        bytes32 gameKey = createPlayerOneMoveHash(msg.sender, secret, playerOneMove);
         Game storage game = games[gameKey];
         require(game.step == uint256(Steps.PLAYER_TWO_MOVE), INVALID_STEP_MSG);
 
@@ -165,12 +166,13 @@ contract RockPaperScissors is Ownable, Pausable {
 
     function revealPlayerTwo(bytes32 gameKey, bytes32 secret, uint256 playerTwoMove) external whenNotPaused {
 
+        require(playerTwoMove < 3, INVALID_MOVE_MSG);
         Game storage game = games[gameKey];
         require(game.step == uint256(Steps.PLAYER_ONE_REVEAL), INVALID_STEP_MSG);
         address playerTwo = game.playerTwo;
 
         //Validate move
-        bytes32 expectedMoveHash = createPlayerTwoMoveHash(gameKey, secret, playerTwoMove);
+        bytes32 expectedMoveHash = createPlayerTwoMoveHash(msg.sender, gameKey, secret, playerTwoMove);
         require(game.playerTwoMoveHash == expectedMoveHash, HASH_MISMATCH_MSG);
 
         emit PlayerTwoReveals(msg.sender, gameKey, playerTwoMove);
@@ -297,22 +299,22 @@ contract RockPaperScissors is Ownable, Pausable {
     }
 
     // This can only be used once because it is used as a mapping key
-    function createPlayerOneMoveHash(bytes32 secret, uint move) public view returns(bytes32) {
+    function createPlayerOneMoveHash(address player, bytes32 secret, uint move) public pure returns(bytes32) {
 
         require(secret != bytes32(0), SECRET_EMPTY_MSG);
         require(move < 3, INVALID_MOVE_MSG);
 
-        return keccak256(abi.encodePacked(msg.sender, secret, move));
+        return keccak256(abi.encodePacked(player, secret, move));
     }
 
     // Even if the secret is reused, the hash will always be unique because the game key will be unique
-    function createPlayerTwoMoveHash(bytes32 gameKey, bytes32 secret, uint move) public view returns (bytes32) {
+    function createPlayerTwoMoveHash(address player, bytes32 gameKey, bytes32 secret, uint move) public pure returns (bytes32) {
 
         require(gameKey != bytes32(0), "Game key cannot be empty");
         require(secret != bytes32(0), SECRET_EMPTY_MSG);
         require(move < 3, INVALID_MOVE_MSG);
 
-        return keccak256(abi.encodePacked(msg.sender, gameKey, secret, move));
+        return keccak256(abi.encodePacked(player, gameKey, secret, move));
     }
 
     function pause() public onlyOwner {
