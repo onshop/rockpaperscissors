@@ -31,6 +31,10 @@ contract RockPaperScissors is Ownable, Pausable {
         PLAYER_ONE_REVEAL // 3
     }
 
+    event Moves {
+
+    }
+
     Steps public steps;
 
     struct Game {
@@ -214,7 +218,7 @@ contract RockPaperScissors is Ownable, Pausable {
     }
 
     function isWinner(uint256 playerOneMove, uint256 playerTwoMove) public pure returns (bool) {
-        return SafeMath.mod(playerTwoMove.add(1), 3) == playerOneMove;
+        return playerTwoMove.add(1).mod(3) == playerOneMove;
     }
 
     /*
