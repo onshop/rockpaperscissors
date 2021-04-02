@@ -10,9 +10,14 @@ contract('rcp', async accounts => {
     const playerTwoSecretString = "secret2";
     const wrongSecretString = "wrongSecret";
     
-    const ROCK = 0;
-    const PAPER = toBN(1);
-    const SCISSORS = toBN(2);
+    const ROCK = toBN(1);
+    const PAPER = toBN(2);
+    const SCISSORS = toBN(3);
+
+    const DRAW = "0";
+    const LEFTWIN = "1";
+    const RIGHTWIN = "2";
+    const INCORRECT = "3";
 
     const INIT = "0";
     const PLAYER_ONE_MOVE = "1";
@@ -30,6 +35,7 @@ contract('rcp', async accounts => {
     const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
     const ZERO_BYTES_32 = "0x0000000000000000000000000000000000000000000000000000000000000000";
     const DAY_24_HOUR_IN_SECS = 86400;
+    const TIMEOUT = 2500000
 
     const getBlockTimeStamp = async(txObj) => {
 
@@ -58,10 +64,7 @@ contract('rcp', async accounts => {
     const playerTwoSecretBytes32 = await soliditySha3(playerTwoSecretString);
     const wrongSecretBytes32 = await soliditySha3(wrongSecretString);
 
-    let rcp;
-    let gameKey;
-    let playerTwoMoveHash;
-    let snapshotId;
+    let rcp, gameKey, playerTwoMoveHash, snapshotId;
 
     beforeEach("Deploy and prepare", async function() {
         rcp = await Game.new({from: contractOwner});
@@ -77,8 +80,9 @@ contract('rcp', async accounts => {
 
     describe("Player moves", async () => {
 
-        it("createPlayerOneMoveHash() hashes the player's address, secret and move", async () => {
-            const expectedMoveHash =  await soliditySha3(playerOne, playerOneSecretBytes32, 0);
+        it("Player one hashes their address, secret and move", async () => {
+            gameKey = await rcp.createPlayerOneMoveHash(playerOne, playerOneSecretBytes32, ROCK);
+            const expectedMoveHash =  await soliditySha3(playerOne, playerOneSecretBytes32, ROCK);
             assert.strictEqual(expectedMoveHash, gameKey);
         });
 
@@ -105,14 +109,16 @@ contract('rcp', async accounts => {
         });
 
         it("Value sent that exceeds the stake, is sent to the player's balance", async () => {
+            gameKey = await rcp.createPlayerOneMoveHash(playerOne, playerOneSecretBytes32, PAPER);
             await rcp.movePlayerOne(gameKey, toBN(5), {from: playerOne, value: toBN(7)});
-
             const playerOneOwed = await rcp.balances(playerOne);
             assert.strictEqual(playerOneOwed.toString(10), "2");
         });
 
-        it("createPlayerTwoMoveHash() hashes the player's address, game key, secret and move", async () => {
-            const expectedMoveHash =  await soliditySha3(playerTwo, gameKey, playerTwoSecretBytes32, PAPER);
+        it("Player two hashes their address, game key, secret and move", async () => {
+            gameKey = await rcp.createPlayerOneMoveHash(playerOne, playerOneSecretBytes32, ROCK);
+            const playerTwoMoveHash = await rcp.createPlayerTwoMoveHash(playerTwo, gameKey, playerTwoSecretBytes32, SCISSORS);
+            const expectedMoveHash =  await soliditySha3(playerTwo, gameKey, playerTwoSecretBytes32, SCISSORS);
             assert.strictEqual(expectedMoveHash, playerTwoMoveHash);
         });
 
@@ -145,9 +151,11 @@ contract('rcp', async accounts => {
 
         it("Player one reveals", async () => {
 
+            gameKey = await rcp.createPlayerOneMoveHash(playerOne, playerOneSecretBytes32, SCISSORS);
             await rcp.movePlayerOne(gameKey, toBN(10), {from: playerOne, value: toBN(10)});
+            playerTwoMoveHash = await rcp.createPlayerTwoMoveHash(playerTwo, gameKey, playerTwoSecretBytes32, PAPER);
             await rcp.movePlayerTwo(gameKey, playerTwoMoveHash, {from: playerTwo, value: toBN(10)});
-            const txObj = await rcp.revealPlayerOne(playerOneSecretBytes32, ROCK, {from: playerOne});
+            const txObj = await rcp.revealPlayerOne(playerOneSecretBytes32, SCISSORS, {from: playerOne});
 
             const timestamp = await getBlockTimeStamp(txObj);
             const expiryDate = timestamp + DAY_24_HOUR_IN_SECS;
@@ -156,19 +164,22 @@ contract('rcp', async accounts => {
 
                 return  ev.player === playerOne &&
                         ev.gameKey === gameKey &&
-                        ev.move.toString(10) === "0" &&
+                        ev.move.toString(10) === "3" &&
                         ev.expiryDate.toString(10) === expiryDate.toString(10)
             },'PlayerOneReveals event is emitted');
 
             const game = await rcp.games(gameKey);
-            assert.strictEqual(game.playerOneMove.toString(10), ROCK.toString(10));
+            assert.strictEqual(game.playerOneMove.toString(10), SCISSORS.toString(10));
             assert.strictEqual(game.step.toString(10), PLAYER_ONE_REVEAL);
             assert.strictEqual(game.expiryDate.toString(10), expiryDate.toString(10));
         });
 
 
         it("Player two reveals and player two wins", async () => {
+
+            gameKey = await rcp.createPlayerOneMoveHash(playerOne, playerOneSecretBytes32, ROCK);
             await rcp.movePlayerOne(gameKey, toBN(10), {from: playerOne, value: toBN(10)});
+            playerTwoMoveHash = await rcp.createPlayerTwoMoveHash(playerTwo, gameKey, playerTwoSecretBytes32, PAPER);
             await rcp.movePlayerTwo(gameKey, playerTwoMoveHash, {from: playerTwo, value: toBN(10)});
             await rcp.revealPlayerOne(playerOneSecretBytes32, ROCK, {from: playerOne});
             const txObj = await rcp.revealPlayerTwo(gameKey, playerTwoSecretBytes32, PAPER, {from: playerTwo});
@@ -177,22 +188,16 @@ contract('rcp', async accounts => {
 
                 return  ev.player === playerTwo &&
                         ev.gameKey === gameKey &&
-                        ev.move.toString(10) === "1"
+                        ev.move.toString(10) === "2"
             },'PlayerTwoReveals event is emitted');
 
             await truffleAssert.eventEmitted(txObj, 'GamePayment', (ev) => {
 
                 return  ev.player === playerTwo &&
-                    ev.gameKey === gameKey &&
-                    ev.amount.toString(10) === "19"
+                        ev.gameKey === gameKey &&
+                        ev.amount.toString(10) === "20"
             },'GamePayment event is emitted');
 
-           await truffleAssert.eventEmitted(txObj, 'GamePayment', (ev) => {
-
-                return  ev.player === playerOne &&
-                    ev.gameKey === gameKey &&
-                    ev.amount.toString(10) === "1"
-            },'GamePayment event is emitted');
 
             const game = await rcp.games(gameKey);
             assert.strictEqual(game.stake.toString(10), INIT);
@@ -201,13 +206,13 @@ contract('rcp', async accounts => {
             assert.strictEqual(game.playerTwoMoveHash, ZERO_BYTES_32);
             assert.strictEqual(game.playerOneMove.toString(10), "0");
             assert.strictEqual(game.expiryDate.toString(10), "0");
-            assert.strictEqual(game.step.toString(10), INIT);
+            assert.strictEqual(game.step.toString(10), "0");
 
             const playerOneOwed = await rcp.balances(playerOne);
             const playerTwoOwed = await rcp.balances(playerTwo);
 
-            assert.strictEqual(playerOneOwed.toString(10), "1");
-            assert.strictEqual(playerTwoOwed.toString(10), "19");
+            assert.strictEqual(playerOneOwed.toString(10), "0");
+            assert.strictEqual(playerTwoOwed.toString(10), "20");
         });
 
         it("Player two reveals and the game is a draw", async () => {
@@ -291,15 +296,15 @@ contract('rcp', async accounts => {
         await rcp.revealPlayerTwo(gameKey, playerTwoSecretBytes32, PAPER, {from: playerTwo});
 
         const initPlayerTwoOwed = await rcp.balances(playerTwo);
-        assert.strictEqual(initPlayerTwoOwed.toString(10), "19");
+        assert.strictEqual(initPlayerTwoOwed.toString(10), "20");
 
         const playerMoveHash = await rcp.createPlayerOneMoveHash(playerTwo, playerOneSecretBytes32, ROCK);
-        await rcp.movePlayerOne(playerMoveHash, toBN(10), {from: playerTwo});
+        await rcp.movePlayerOne(playerMoveHash, toBN(5), {from: playerTwo});
 
         const playerTwoOwed = await rcp.balances(playerTwo);
-        assert.strictEqual(playerTwoOwed.toString(10), "9");
+        assert.strictEqual(playerTwoOwed.toString(10), "15");
 
-    });
+    }).timeout(TIMEOUT);
 
     it("Player ends the game early and collects their stake", async () => {
 
@@ -343,22 +348,38 @@ contract('rcp', async accounts => {
 
     });
 
-    describe('Calculating the winner', async function(){
+    describe('Game outcome calculated', async function(){
 
         it("Winner correctly calculated", async () => {
-            //Paper wins
-            const isPaperWinner = await rcp.isWinner(PAPER, ROCK);
-            assert.isTrue(isPaperWinner);
+            const paperWinner1 = await rcp.resolveGame(PAPER, ROCK);
+            assert.strictEqual(paperWinner1.toString(10), LEFTWIN);
 
-            //Rock wins
-            const isRockWinner = await rcp.isWinner(ROCK, SCISSORS);
-            assert.isTrue(isRockWinner);
+            const rockWinner1 = await rcp.resolveGame(ROCK, SCISSORS);
+            assert.strictEqual(rockWinner1.toString(10), LEFTWIN);
 
-            //Scissors wins
-            const isScissorsWinner = await rcp.isWinner(SCISSORS, PAPER);
-            assert.isTrue(isScissorsWinner);
+            const scissorsWinner1 = await rcp.resolveGame(SCISSORS, PAPER);
+            assert.strictEqual(scissorsWinner1.toString(10), LEFTWIN);
+
+            const paperWinner2 = await rcp.resolveGame(ROCK, PAPER);
+            assert.strictEqual(paperWinner2.toString(10), RIGHTWIN);
+
+            const rockWinner2 = await rcp.resolveGame(SCISSORS, ROCK);
+            assert.strictEqual(rockWinner2.toString(10), RIGHTWIN);
+
+            const scissorsWinner2 = await rcp.resolveGame(PAPER, SCISSORS);
+            assert.strictEqual(scissorsWinner2.toString(10), RIGHTWIN);
+
+            const drawWinner = await rcp.resolveGame(SCISSORS, SCISSORS);
+            assert.strictEqual(drawWinner.toString(10), DRAW);
         });
 
+        it("Game outcome calculated and move values validated", async () => {
+            const errorResultLeft1 = await rcp.resolveGame(4, 0);
+            assert.strictEqual(errorResultLeft1.toString(10), INCORRECT);
+
+            const errorResultLeft2 = await rcp.resolveGame(0, 4);
+            assert.strictEqual(errorResultLeft2.toString(10), INCORRECT);
+        });
     });
 
     describe('Player one move validation', async function() {
@@ -401,7 +422,8 @@ contract('rcp', async accounts => {
                 MOVE_HASH_EMPTY_MSG
             );
             checkEventNotEmitted();
-        });
+
+        }).timeout(TIMEOUT);
 
         it("Call reverts when player two moves a second time", async () => {
             await rcp.movePlayerOne(gameKey, toBN(10), {from: playerOne, value: toBN(10)});
@@ -444,13 +466,18 @@ contract('rcp', async accounts => {
                 INVALID_STEP_MSG
             );
             checkEventNotEmitted();
-        }).timeout(10000);
+        }).timeout(TIMEOUT);
 
         it("Call reverts when an invalid move is used for the player one reveal", async () => {
             await rcp.movePlayerOne(gameKey, toBN(10), {from: playerOne, value: toBN(10)});
             await rcp.movePlayerTwo(gameKey, playerTwoMoveHash, {from: playerTwo, value: toBN(10)});
+
             await truffleAssert.reverts(
-                rcp.revealPlayerOne(playerTwoSecretBytes32, toBN(3), {from: playerOne}),
+                rcp.revealPlayerOne(playerTwoSecretBytes32, 0, {from: playerOne}),
+                INVALID_MOVE_MSG
+            );
+            await truffleAssert.reverts(
+                rcp.revealPlayerOne(playerTwoSecretBytes32, toBN(4), {from: playerOne}),
                 INVALID_MOVE_MSG
             );
             checkEventNotEmitted();
@@ -489,11 +516,16 @@ contract('rcp', async accounts => {
             await rcp.revealPlayerOne(playerOneSecretBytes32, ROCK, {from: playerOne});
 
             await truffleAssert.reverts(
-                rcp.revealPlayerTwo(gameKey, playerTwoSecretBytes32, toBN(3), {from: playerTwo}),
+                rcp.revealPlayerTwo(gameKey, playerTwoSecretBytes32, 0, {from: playerTwo}),
+                INVALID_MOVE_MSG
+            );
+            await truffleAssert.reverts(
+                rcp.revealPlayerTwo(gameKey, playerTwoSecretBytes32, toBN(4), {from: playerTwo}),
                 INVALID_MOVE_MSG
             );
             checkEventNotEmitted();
-        });
+
+        }).timeout(TIMEOUT);
     });
 
 
@@ -525,7 +557,7 @@ contract('rcp', async accounts => {
                 INVALID_PLAYER_MSG
             );
             checkEventNotEmitted();
-        }).timeout(10000);;
+        }).timeout(TIMEOUT);
 
         it("Call reverts when player one collects forfeit before the game has expired", async () => {
 
@@ -552,7 +584,7 @@ contract('rcp', async accounts => {
                 INVALID_STEP_MSG
             );
             checkEventNotEmitted();
-        }).timeout(10000);
+        }).timeout(TIMEOUT);
 
         it("Call reverts when player one tries to collect player two's forfeit", async () => {
 
@@ -595,7 +627,11 @@ contract('rcp', async accounts => {
         it("Call reverts when player one creates a move hash with an invalid move", async () => {
 
             await truffleAssert.reverts(
-                rcp.createPlayerOneMoveHash(playerOne, playerOneSecretBytes32, toBN(3)),
+                rcp.createPlayerOneMoveHash(playerOne, playerOneSecretBytes32, 0),
+                INVALID_MOVE_MSG
+            );
+            await truffleAssert.reverts(
+                rcp.createPlayerOneMoveHash(playerOne, playerOneSecretBytes32, toBN(4)),
                 INVALID_MOVE_MSG
             );
             checkEventNotEmitted();
@@ -622,11 +658,16 @@ contract('rcp', async accounts => {
         it("Call reverts when player two creates a move hash with an invalid move", async () => {
 
             await truffleAssert.reverts(
-                rcp.createPlayerTwoMoveHash(playerOne, gameKey, playerTwoSecretBytes32, toBN(3)),
+                rcp.createPlayerTwoMoveHash(playerOne, gameKey, playerTwoSecretBytes32, 0),
+                INVALID_MOVE_MSG
+            );
+            await truffleAssert.reverts(
+                rcp.createPlayerTwoMoveHash(playerOne, gameKey, playerTwoSecretBytes32, toBN(4)),
                 INVALID_MOVE_MSG
             );
             checkEventNotEmitted();
-        });
+
+        }).timeout(TIMEOUT);
     });
 
     describe('Checking pausible functions can be paused', async function() {
@@ -645,7 +686,7 @@ contract('rcp', async accounts => {
             const txObj = await rcp.movePlayerOne(gameKey, toBN(10), {from: playerOne, value: toBN(10)});
             await truffleAssert.eventEmitted(txObj, 'PlayerOneMoves');
 
-        }).timeout(100000);
+        }).timeout(TIMEOUT);
 
         it("Player two move is pausable and unpausable", async () => {
 
@@ -662,7 +703,8 @@ contract('rcp', async accounts => {
             await rcp.unpause({from: contractOwner});
             const txObj = await rcp.movePlayerTwo(gameKey, playerTwoMoveHash, {from: playerTwo, value: toBN(10)});
             await truffleAssert.eventEmitted(txObj, 'PlayerTwoMoves');
-        });
+
+        }).timeout(TIMEOUT);
 
         it("Player one reveal is pausable and unpausable", async () => {
 
@@ -680,7 +722,8 @@ contract('rcp', async accounts => {
             await rcp.unpause({from: contractOwner});
             const txObj = await rcp.revealPlayerOne(playerOneSecretBytes32, ROCK, {from: playerOne});
             await truffleAssert.eventEmitted(txObj, 'PlayerOneReveals');
-        });
+
+        }).timeout(TIMEOUT);
 
         it("Player two reveal is pausable and unpausable", async () => {
 
@@ -719,7 +762,8 @@ contract('rcp', async accounts => {
             await rcp.unpause({from: contractOwner});
             const txObj = await rcp.playerOneCollectsForfeit(gameKey, {from: playerOne});
             await truffleAssert.eventEmitted(txObj, 'ForfeitPaid');
-        });
+            
+        }).timeout(TIMEOUT);
 
         it("Player two collecting forfeit is pausable and unpausable", async () => {
 
@@ -740,5 +784,4 @@ contract('rcp', async accounts => {
             await truffleAssert.eventEmitted(txObj, 'ForfeitPaid');
         });
     });
-
 });
