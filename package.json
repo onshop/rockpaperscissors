@@ -13,10 +13,10 @@
   },
   "mocha": {
     "enableTimeouts": false,
-    "before_timeout": 120000
+    "before_timeout": 2500000
   },
   "scripts": {
-    "test": "test"
+    "test": "test --timeout 2500000"
   },
   "repository": {
     "type": "git",
