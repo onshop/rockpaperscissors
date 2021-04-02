@@ -31,13 +31,13 @@ contract RockPaperScissors is Ownable, Pausable {
     }
     Steps public steps;
 
-    enum Moves {
+    enum GameResult {
         DRAW, // 0
         LEFTWIN, // 1
         RIGHTWIN, // 2
         INCORRECT // 3
     }
-    Moves public moves;
+    GameResult public moves;
 
     struct Game {
         uint256 stake;
@@ -189,7 +189,7 @@ contract RockPaperScissors is Ownable, Pausable {
         address loser;
         uint256 outcome = resolveGame(playerOneMove, playerTwoMove);
 
-        if (outcome == uint256(Moves.DRAW)) {
+        if (outcome == uint256(GameResult.DRAW)) {
             resetGame(game);
             balances[playerOne] = balances[playerOne].add(stake);
             balances[playerTwo] = balances[playerTwo].add(stake);
@@ -197,10 +197,10 @@ contract RockPaperScissors is Ownable, Pausable {
 
             return;
 
-        } else if (outcome == uint256(Moves.LEFTWIN)) {
+        } else if (outcome == uint256(GameResult.LEFTWIN)) {
             winner = playerOne;
             loser = playerTwo;
-        } else if (outcome == uint256(Moves.RIGHTWIN)) {
+        } else if (outcome == uint256(GameResult.RIGHTWIN)) {
             winner = playerTwo;
             loser = playerOne;
         } else {
@@ -216,16 +216,16 @@ contract RockPaperScissors is Ownable, Pausable {
     function resolveGame(uint256 leftPlayer, uint256 rightPlayer) public pure returns(uint256) {
 
         if (leftPlayer == 0 || leftPlayer > 3 || rightPlayer == 0 || rightPlayer > 3) {
-            return uint256(Moves.INCORRECT);
+            return uint256(GameResult.INCORRECT);
         }
 
         if (rightPlayer.mod(3) == leftPlayer.sub(1)) {
-            return uint256(Moves.LEFTWIN);
+            return uint256(GameResult.LEFTWIN);
         } else if (leftPlayer.mod(3) == rightPlayer.sub(1)) {
-            return uint256(Moves.RIGHTWIN);
+            return uint256(GameResult.RIGHTWIN);
         }
 
-        return uint256(Moves.DRAW);
+        return uint256(GameResult.DRAW);
     }
 
     /*
