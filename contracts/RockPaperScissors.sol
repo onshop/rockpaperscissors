@@ -50,50 +50,50 @@ contract RockPaperScissors is Ownable, Pausable {
     }
 
     event PlayerOneMoves(
-        address indexed player,
         bytes32 indexed gameKey,
+        address indexed player,
         uint256 stake,
         uint256 amount
     );
 
     event PlayerTwoMoves(
+        bytes32 indexed gameKey,
         address indexed player,
         uint256 amount,
-        bytes32 indexed gameKey,
         bytes32 moveHash,
         uint256 expiryDate
     );
 
     event PlayerOneReveals(
-        address indexed player,
         bytes32 indexed gameKey,
+        address indexed player,
         uint8 move,
         uint256 expiryDate
     );
 
     event PlayerTwoReveals(
-        address indexed player,
         bytes32 indexed gameKey,
+        address indexed player,
         uint8 move
     );
 
     event DrawRefund(
+        bytes32 indexed gameKey,
         address indexed playerOne,
         address indexed playerTwo,
-        bytes32 indexed gameKey,
         uint256 playerOneRefund,
         uint256 playerTwoRefund
     );
 
     event GamePayment(
-        address indexed player,
         bytes32 indexed gameKey,
+        address indexed player,
         uint256 amount
     );
 
     event ForfeitPaid(
-        address indexed player,
         bytes32 indexed gameKey,
+        address indexed player,
         uint256 amount
     );
 
@@ -103,16 +103,16 @@ contract RockPaperScissors is Ownable, Pausable {
     );
 
     event PlayerOneEndsGame(
-        address indexed player,
         bytes32 indexed gameKey,
+        address indexed player,
         uint256 amount
     );
 
     // The creator's move is embedded in the game key
-    function movePlayerOne(bytes32 moveHash, uint256 stake) external payable whenNotPaused {
+    function movePlayerOne(bytes32 gameKey, uint256 stake) external payable whenNotPaused {
 
-        require(moveHash != bytes32(0), "Move hash is empty");
-        Game storage game = games[moveHash];
+        require(gameKey != bytes32(0), "Game key hash is empty");
+        Game storage game = games[gameKey];
         require(game.step == uint8(Steps.INIT), INVALID_STEP_MSG);
         require(game.playerOne == NULL_ADDRESS, INVALID_MOVE_MSG);
 
@@ -121,7 +121,7 @@ contract RockPaperScissors is Ownable, Pausable {
         game.step = uint8(Steps.PLAYER_ONE_MOVE);
         depositStake(stake);
 
-        emit PlayerOneMoves(msg.sender, moveHash, stake, msg.value);
+        emit PlayerOneMoves(gameKey, msg.sender, stake, msg.value);
     }
 
     function movePlayerTwo(bytes32 gameKey, bytes32 moveHash) external payable whenNotPaused {
@@ -137,7 +137,7 @@ contract RockPaperScissors is Ownable, Pausable {
         game.expiryDate = expiryDate;
         depositStake(game.stake);
 
-        emit PlayerTwoMoves(msg.sender, msg.value, gameKey, moveHash, expiryDate);
+        emit PlayerTwoMoves(gameKey, msg.sender, msg.value, moveHash, expiryDate);
     }
 
     function depositStake(uint256 stake) internal {
@@ -166,7 +166,7 @@ contract RockPaperScissors is Ownable, Pausable {
         game.step = uint8(Steps.PLAYER_ONE_REVEAL);
         game.expiryDate = expiryDate;
 
-        emit PlayerOneReveals(msg.sender, gameKey, uint8(playerOneMove), expiryDate);
+        emit PlayerOneReveals(gameKey, msg.sender, uint8(playerOneMove), expiryDate);
     }
 
     function revealPlayerTwo(bytes32 gameKey, bytes32 secret, uint256 playerTwoMove) external whenNotPaused {
@@ -180,7 +180,7 @@ contract RockPaperScissors is Ownable, Pausable {
         bytes32 expectedMoveHash = createPlayerTwoMoveHash(msg.sender, gameKey, secret, playerTwoMove);
         require(game.playerTwoMoveHash == expectedMoveHash, HASH_MISMATCH_MSG);
 
-        emit PlayerTwoReveals(msg.sender, gameKey, uint8(playerTwoMove));
+        emit PlayerTwoReveals(gameKey, msg.sender, uint8(playerTwoMove));
 
         uint256 stake = game.stake;
         address playerOne = game.playerOne;
@@ -193,7 +193,7 @@ contract RockPaperScissors is Ownable, Pausable {
             resetGame(game);
             balances[playerOne] = balances[playerOne].add(stake);
             balances[playerTwo] = balances[playerTwo].add(stake);
-            DrawRefund(playerOne, playerTwo, gameKey, stake, stake);
+            DrawRefund(gameKey, playerOne, playerTwo, stake, stake);
 
             return;
 
@@ -208,7 +208,7 @@ contract RockPaperScissors is Ownable, Pausable {
         }
         uint256 winnings = stake.mul(2);
         balances[winner] = balances[winner].add(winnings);
-        emit GamePayment(winner, gameKey, winnings);
+        emit GamePayment(gameKey, winner, winnings);
 
         resetGame(game);
     }
@@ -248,7 +248,7 @@ contract RockPaperScissors is Ownable, Pausable {
         resetGame(game);
         balances[playerOne] = balances[playerOne].add(forfeit);
 
-        emit ForfeitPaid(playerOne, gameKey, forfeit);
+        emit ForfeitPaid(gameKey, playerOne, forfeit);
     }
 
     /*
@@ -268,7 +268,7 @@ contract RockPaperScissors is Ownable, Pausable {
         resetGame(game);
         balances[playerTwo] = balances[playerTwo].add(forfeit);
 
-        emit ForfeitPaid(playerTwo, gameKey, forfeit);
+        emit ForfeitPaid(gameKey, playerTwo, forfeit);
     }
 
     function playerOneEndsGame(bytes32 gameKey) whenNotPaused external whenNotPaused {
@@ -282,7 +282,7 @@ contract RockPaperScissors is Ownable, Pausable {
         resetGame(game);
         balances[playerOne] = balances[playerOne].add(stake);
 
-        emit PlayerOneEndsGame(playerOne, gameKey, stake);
+        emit PlayerOneEndsGame(gameKey, playerOne, stake);
     }
 
     function withdraw(uint amount) external whenNotPaused returns(bool success) {

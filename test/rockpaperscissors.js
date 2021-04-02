@@ -28,7 +28,6 @@ contract('rcp', async accounts => {
     const INVALID_STEP_MSG = "Invalid step";
     const HASH_MISMATCH_MSG = "Move and secret do not match";
     const GAME_NOT_EXPIRED_MSG = "Game has not expired";
-    const MOVE_HASH_EMPTY_MSG = "Move hash is empty";
     const SECRET_EMPTY_MSG = "Secret is empty";
     const INVALID_PLAYER_MSG = "Invalid player";
 
@@ -410,7 +409,7 @@ contract('rcp', async accounts => {
         it("Call reverts when player one moves with an empty hash", async () => {
             await truffleAssert.reverts(
                 rcp.movePlayerOne(ZERO_BYTES_32, toBN(10), {from: playerOne, value: toBN(10)}),
-                MOVE_HASH_EMPTY_MSG
+                "Game key hash is empty"
             );
         });
 
@@ -440,7 +439,7 @@ contract('rcp', async accounts => {
             await rcp.movePlayerOne(gameKey, toBN(10), {from: playerOne, value: toBN(10)});
             await truffleAssert.reverts(
                 rcp.movePlayerTwo(gameKey, ZERO_BYTES_32, {from: playerTwo, value: toBN(10)}),
-                MOVE_HASH_EMPTY_MSG
+                "Move hash is empty"
             );
 
         }).timeout(TIMEOUT);
