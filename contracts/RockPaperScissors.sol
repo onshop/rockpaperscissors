@@ -163,9 +163,9 @@ contract RockPaperScissors is Ownable, Pausable {
         balances[msg.sender] = senderBalance.add(msg.value).sub(stake);
     }
 
-    function revealPlayerOne(bytes32 secret, uint8 playerOneMove) external whenNotPaused {
+    function revealPlayerOne(bytes32 secret, Moves playerOneMove) external whenNotPaused {
 
-        require(Moves(playerOneMove) >= Moves.ROCK && Moves(playerOneMove) <= Moves.SCISSORS, INVALID_MOVE_MSG);
+        require(Moves(playerOneMove) >= Moves.ROCK, INVALID_MOVE_MSG);
         bytes32 gameKey = createPlayerOneMoveHash(msg.sender, secret, Moves(playerOneMove));
         Game storage game = games[gameKey];
 
