@@ -169,7 +169,7 @@ contract RockPaperScissors is Ownable, Pausable {
         emit PlayerOneReveals(gameKey, msg.sender, uint8(playerOneMove), expiryDate);
     }
 
-    function revealPlayerTwo(bytes32 gameKey, bytes32 secret, uint256 playerTwoMove) external whenNotPaused {
+    function revealPlayerTwo(bytes32 gameKey, bytes32 secret, uint8 playerTwoMove) external whenNotPaused {
 
         require(playerTwoMove > 0 && playerTwoMove < 4, INVALID_MOVE_MSG);
         Game storage game = games[gameKey];
@@ -180,16 +180,16 @@ contract RockPaperScissors is Ownable, Pausable {
         bytes32 expectedMoveHash = createPlayerTwoMoveHash(msg.sender, gameKey, secret, playerTwoMove);
         require(game.playerTwoMoveHash == expectedMoveHash, HASH_MISMATCH_MSG);
 
-        emit PlayerTwoReveals(gameKey, msg.sender, uint8(playerTwoMove));
+        emit PlayerTwoReveals(gameKey, msg.sender, playerTwoMove);
 
         uint256 stake = game.stake;
         address playerOne = game.playerOne;
-        uint256 playerOneMove = uint256(game.playerOneMove);
+        uint8 playerOneMove = game.playerOneMove;
         address winner;
         address loser;
-        uint256 outcome = resolveGame(playerOneMove, playerTwoMove);
+        uint8 outcome = resolveGame(playerOneMove, playerTwoMove);
 
-        if (outcome == uint256(GameResult.DRAW)) {
+        if (outcome == uint8(GameResult.DRAW)) {
             resetGame(game);
             balances[playerOne] = balances[playerOne].add(stake);
             balances[playerTwo] = balances[playerTwo].add(stake);
@@ -197,10 +197,10 @@ contract RockPaperScissors is Ownable, Pausable {
 
             return;
 
-        } else if (outcome == uint256(GameResult.LEFTWIN)) {
+        } else if (outcome == uint8(GameResult.LEFTWIN)) {
             winner = playerOne;
             loser = playerTwo;
-        } else if (outcome == uint256(GameResult.RIGHTWIN)) {
+        } else if (outcome == uint8(GameResult.RIGHTWIN)) {
             winner = playerTwo;
             loser = playerOne;
         } else {
@@ -213,28 +213,15 @@ contract RockPaperScissors is Ownable, Pausable {
         resetGame(game);
     }
 
-    function resolveGame(uint256 leftPlayer, uint256 rightPlayer) public pure returns(uint256) {
+    function resolveGame(uint8 leftPlayer, uint8 rightPlayer) public pure returns(uint8) {
 
         if (leftPlayer == 0 || leftPlayer > 3 || rightPlayer == 0 || rightPlayer > 3) {
-            return uint256(GameResult.INCORRECT);
+            return uint8(GameResult.INCORRECT);
         }
 
-        if (rightPlayer.mod(3) == leftPlayer.sub(1)) {
-            return uint256(GameResult.LEFTWIN);
-        } else if (leftPlayer.mod(3) == rightPlayer.sub(1)) {
-            return uint256(GameResult.RIGHTWIN);
-        }
-
-        return uint256(GameResult.DRAW);
+        return uint8(GameResult((uint256(leftPlayer).add(3).sub(uint256(rightPlayer))).mod(3)));
     }
 
-    /*
-    * If expiry has passed, and player 2 has not revealed then:
-    * - Player 1 pays no fee as a compensation
-    * - Player 2 is disincentivised by not getting a fee refunded that they would have received if resolved.
-    *
-    * - If no player joins the game, then player 1 gets back their stake
-    */
     function playerOneCollectsForfeit(bytes32 gameKey) whenNotPaused external whenNotPaused {
 
         Game storage game = games[gameKey];
@@ -251,11 +238,6 @@ contract RockPaperScissors is Ownable, Pausable {
         emit ForfeitPaid(gameKey, playerOne, forfeit);
     }
 
-    /*
-    * If expiry has passed, and player 1 has not revealed
-    * They pay no fee as a compensation
-    * Player 1 is disincentivised by not getting a fee refunded that would have received if they revealed.
-    */
     function playerTwoCollectsForfeit(bytes32 gameKey) whenNotPaused external whenNotPaused {
 
         Game storage game = games[gameKey];

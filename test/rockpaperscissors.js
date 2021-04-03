@@ -34,7 +34,7 @@ contract('rcp', async accounts => {
     const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
     const ZERO_BYTES_32 = "0x0000000000000000000000000000000000000000000000000000000000000000";
     const DAY_24_HOUR_IN_SECS = 86400;
-    const TIMEOUT = 3500000
+    const TIMEOUT = 5000000
 
     const getBlockTimeStamp = async(txObj) => {
 
@@ -67,7 +67,7 @@ contract('rcp', async accounts => {
         await timeMachine.revertToSnapshot(snapshotId);
     });
 
-/*    describe("Player moves", async () => {
+    describe("Player moves", async () => {
 
       it("Player one hashes their address, secret and move", async () => {
             gameKey = await rcp.createPlayerOneMoveHash(playerOne, playerOneSecretBytes32, ROCK);
@@ -154,11 +154,11 @@ contract('rcp', async accounts => {
             assert.strictEqual(game.step.toString(10), PLAYER_TWO_MOVE);
 
         });
-    });*/
+    });
 
     describe("Player reveals", async () => {
 
-/*        it("Player one reveals", async () => {
+        it("Player one reveals", async () => {
 
             gameKey = await rcp.createPlayerOneMoveHash(playerOne, playerOneSecretBytes32, PAPER);
             await rcp.movePlayerOne(gameKey, "10", {from: playerOne, value: 10});
@@ -181,7 +181,7 @@ contract('rcp', async accounts => {
             assert.strictEqual(game.playerOneMove.toString(10), PAPER.toString(10));
             assert.strictEqual(game.step.toString(10), PLAYER_ONE_REVEAL);
             assert.strictEqual(game.expiryDate.toString(10), expiryDate.toString(10));
-        });*/
+        });
 
 
         it("Player two reveals and player two wins", async () => {
@@ -662,7 +662,7 @@ contract('rcp', async accounts => {
                 rcp.playerTwoCollectsForfeit(gameKey, {from: playerTwo}),
                 GAME_NOT_EXPIRED_MSG
             );
-        });
+        }).timeout(TIMEOUT);
     });
 
     describe('Player hash creation validation', async function() {
