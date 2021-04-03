@@ -10,9 +10,9 @@ contract('rcp', async accounts => {
     const playerTwoSecretString = "secret2";
     const wrongSecretString = "wrongSecret";
     
-    const ROCK = toBN(1);
-    const PAPER = toBN(2);
-    const SCISSORS = toBN(3);
+    const ROCK = 1;
+    const PAPER = 2;
+    const SCISSORS = 3;
 
     const DRAW = "0";
     const LEFTWIN = "1";
@@ -34,7 +34,7 @@ contract('rcp', async accounts => {
     const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
     const ZERO_BYTES_32 = "0x0000000000000000000000000000000000000000000000000000000000000000";
     const DAY_24_HOUR_IN_SECS = 86400;
-    const TIMEOUT = 13000000
+    const TIMEOUT = 14000000
 
     const getBlockTimeStamp = async(txObj) => {
 
@@ -667,7 +667,8 @@ contract('rcp', async accounts => {
                 rcp.playerTwoCollectsForfeit(gameKey, {from: playerOne}),
                 INVALID_PLAYER_MSG
             );
-        });
+
+        }).timeout(TIMEOUT);
 
         it("Call reverts when player one collects forfeit before the game has expired", async () => {
 
@@ -691,7 +692,8 @@ contract('rcp', async accounts => {
                 rcp.createPlayerOneMoveHash(playerOne, ZERO_BYTES_32, ROCK),
                 SECRET_EMPTY_MSG
             );
-        });
+
+        }).timeout(TIMEOUT);
 
         it("Call reverts when player one creates a move hash with an invalid move", async () => {
 
@@ -707,7 +709,8 @@ contract('rcp', async accounts => {
                 rcp.createPlayerTwoMoveHash(playerOne, ZERO_BYTES_32, playerOneSecretBytes32, ROCK),
                 "Game key cannot be empty"
             );
-        });
+
+        }).timeout(TIMEOUT);
 
         it("Call reverts when player two creates a move hash with a zero bytes secret", async () => {
 
@@ -717,7 +720,8 @@ contract('rcp', async accounts => {
                 rcp.createPlayerTwoMoveHash(playerTwo, gameKey, ZERO_BYTES_32, ROCK),
                 SECRET_EMPTY_MSG
             );
-        });
+
+        }).timeout(TIMEOUT);
 
         it("Call reverts when player two creates a move hash with an invalid move", async () => {
 
