@@ -24,8 +24,8 @@ contract RockPaperScissors is Ownable, Pausable {
     uint256 constant FORFEIT_WINDOW = 1 days;
     
     enum Steps {
-        INIT, // 0
-        PLAYER_ONE_MOVE, // 1
+        UNSTARTED, // 0
+        PLAYER_ONE_MOVED, // 1
         PLAYER_TWO_MOVE, // 2
         PLAYER_ONE_REVEAL // 3
     }
@@ -39,10 +39,19 @@ contract RockPaperScissors is Ownable, Pausable {
     }
     GameResult public gameResult;
 
+    enum Moves {
+        EMPTY, // 0
+        ROCK, // 1
+        PAPER, // 2
+        SCISSORS // 3
+    }
+
+    Moves public moves;
+
     struct Game {
         Steps step;
         address playerOne;
-        uint8 playerOneMove;
+        Moves playerOneMove;
         uint256 stake;
         uint256 expiryDate;
         address playerTwo;
@@ -67,14 +76,14 @@ contract RockPaperScissors is Ownable, Pausable {
     event PlayerOneReveals(
         bytes32 indexed gameKey,
         address indexed player,
-        uint8 move,
+        Moves move,
         uint256 expiryDate
     );
 
     event PlayerTwoReveals(
         bytes32 indexed gameKey,
         address indexed player,
-        uint8 move
+        Moves move
     );
 
     event DrawRefund(
@@ -113,12 +122,12 @@ contract RockPaperScissors is Ownable, Pausable {
 
         require(gameKey != bytes32(0), "Game key hash is empty");
         Game storage game = games[gameKey];
-        require(game.step == Steps.INIT, INVALID_STEP_MSG);
+        require(game.step == Steps.UNSTARTED, INVALID_STEP_MSG);
         require(game.playerOne == NULL_ADDRESS, INVALID_MOVE_MSG);
 
         game.stake = stake;
         game.playerOne = msg.sender;
-        game.step = Steps.PLAYER_ONE_MOVE;
+        game.step = Steps.PLAYER_ONE_MOVED;
         depositStake(stake);
 
         emit PlayerOneMoves(gameKey, msg.sender, stake, msg.value);
@@ -128,7 +137,7 @@ contract RockPaperScissors is Ownable, Pausable {
 
         require(moveHash != bytes32(0), "Move hash is empty");
         Game storage game = games[gameKey];
-        require(game.step == Steps.PLAYER_ONE_MOVE, INVALID_STEP_MSG);
+        require(game.step == Steps.PLAYER_ONE_MOVED, INVALID_STEP_MSG);
 
         uint256 expiryDate = block.timestamp.add(FORFEIT_WINDOW);
         game.playerTwo = msg.sender;
@@ -154,40 +163,39 @@ contract RockPaperScissors is Ownable, Pausable {
         balances[msg.sender] = senderBalance.add(msg.value).sub(stake);
     }
 
-    function revealPlayerOne(bytes32 secret, uint256 playerOneMove) external whenNotPaused {
+    function revealPlayerOne(bytes32 secret, uint8 playerOneMove) external whenNotPaused {
 
-        require(playerOneMove > 0 && playerOneMove < 4, INVALID_MOVE_MSG);
-        bytes32 gameKey = createPlayerOneMoveHash(msg.sender, secret, playerOneMove);
+        require(Moves(playerOneMove) >= Moves.ROCK && Moves(playerOneMove) <= Moves.SCISSORS, INVALID_MOVE_MSG);
+        bytes32 gameKey = createPlayerOneMoveHash(msg.sender, secret, Moves(playerOneMove));
         Game storage game = games[gameKey];
         require(game.step == Steps.PLAYER_TWO_MOVE, INVALID_STEP_MSG);
 
         uint256 expiryDate = block.timestamp.add(FORFEIT_WINDOW);
-        game.playerOneMove = uint8(playerOneMove);
+        game.playerOneMove = Moves(playerOneMove);
         game.step = Steps.PLAYER_ONE_REVEAL;
         game.expiryDate = expiryDate;
 
-        emit PlayerOneReveals(gameKey, msg.sender, uint8(playerOneMove), expiryDate);
+        emit PlayerOneReveals(gameKey, msg.sender, Moves(playerOneMove), expiryDate);
     }
 
-    function revealPlayerTwo(bytes32 gameKey, bytes32 secret, uint8 playerTwoMove) external whenNotPaused {
+    function revealPlayerTwo(bytes32 gameKey, bytes32 secret, Moves playerTwoMove) external whenNotPaused {
 
-        require(playerTwoMove > 0 && playerTwoMove < 4, INVALID_MOVE_MSG);
+        require(Moves(playerTwoMove) > Moves.EMPTY && Moves(playerTwoMove) <= Moves.SCISSORS, INVALID_MOVE_MSG);
         Game storage game = games[gameKey];
         require(game.step == Steps.PLAYER_ONE_REVEAL, INVALID_STEP_MSG);
         address playerTwo = game.playerTwo;
 
         //Validate move
-        bytes32 expectedMoveHash = createPlayerTwoMoveHash(msg.sender, gameKey, secret, playerTwoMove);
+        bytes32 expectedMoveHash = createPlayerTwoMoveHash(msg.sender, gameKey, secret, Moves(playerTwoMove));
         require(game.playerTwoMoveHash == expectedMoveHash, HASH_MISMATCH_MSG);
 
-        emit PlayerTwoReveals(gameKey, msg.sender, playerTwoMove);
+        emit PlayerTwoReveals(gameKey, msg.sender, Moves(playerTwoMove));
 
         uint256 stake = game.stake;
         address playerOne = game.playerOne;
-        uint8 playerOneMove = game.playerOneMove;
         address winner;
         address loser;
-        GameResult outcome = resolveGame(playerOneMove, playerTwoMove);
+        GameResult outcome = resolveGame(uint8(game.playerOneMove), uint8(playerTwoMove));
 
         if (outcome == GameResult.DRAW) {
             resetGame(game);
@@ -204,7 +212,7 @@ contract RockPaperScissors is Ownable, Pausable {
             winner = playerTwo;
             loser = playerOne;
         } else {
-            revert(INVALID_MOVE_MSG);
+            require(outcome != GameResult.INCORRECT, "Bugger");
         }
         uint256 winnings = stake.mul(2);
         balances[winner] = balances[winner].add(winnings);
@@ -213,9 +221,15 @@ contract RockPaperScissors is Ownable, Pausable {
         resetGame(game);
     }
 
+    // Type hinted uint8 because GameResult.INCORRECT will never be returned if Moves enum is used
+    // If the value is out of bounds then an exception will be thrown
     function resolveGame(uint8 leftPlayer, uint8 rightPlayer) public pure returns(GameResult) {
 
-        if (leftPlayer == 0 || leftPlayer > 3 || rightPlayer == 0 || rightPlayer > 3) {
+        if (leftPlayer < uint8(Moves.ROCK) || leftPlayer > uint8(Moves.SCISSORS)) {
+            return GameResult.INCORRECT;
+        }
+
+        if (rightPlayer < uint8(Moves.ROCK) || rightPlayer > uint8(Moves.SCISSORS)) {
             return GameResult.INCORRECT;
         }
 
@@ -256,7 +270,7 @@ contract RockPaperScissors is Ownable, Pausable {
     function playerOneEndsGame(bytes32 gameKey) whenNotPaused external whenNotPaused {
 
         Game storage game = games[gameKey];
-        require(game.step == Steps.PLAYER_ONE_MOVE, INVALID_STEP_MSG);
+        require(game.step == Steps.PLAYER_ONE_MOVED, INVALID_STEP_MSG);
         address playerOne = game.playerOne;
         require(msg.sender == playerOne, INVALID_PLAYER_MSG);
 
@@ -285,28 +299,28 @@ contract RockPaperScissors is Ownable, Pausable {
         game.stake = 0;
         game.playerTwo = address(0);
         game.playerTwoMoveHash = bytes32(0);
-        game.playerOneMove = 0;
+        game.playerOneMove = Moves.EMPTY;
         game.expiryDate = 0;
-        game.step = Steps.INIT;
+        game.step = Steps.UNSTARTED;
     }
 
     // This can only be used once because it is used as a mapping key
-    function createPlayerOneMoveHash(address player, bytes32 secret, uint256 move) public pure returns(bytes32) {
+    function createPlayerOneMoveHash(address player, bytes32 secret, Moves move) public pure returns(bytes32) {
 
         require(secret != bytes32(0), SECRET_EMPTY_MSG);
-        require(move > 0 && move < 4, INVALID_MOVE_MSG);
+        require(Moves(move) > Moves.EMPTY, INVALID_MOVE_MSG);
 
-        return keccak256(abi.encodePacked(player, secret, move));
+        return keccak256(abi.encodePacked(player, secret, uint256(move)));
     }
 
     // Even if the secret is reused, the hash will always be unique because the game key will be unique
-    function createPlayerTwoMoveHash(address player, bytes32 gameKey, bytes32 secret, uint256 move) public pure returns (bytes32) {
+    function createPlayerTwoMoveHash(address player, bytes32 gameKey, bytes32 secret, Moves move) public pure returns (bytes32) {
 
         require(gameKey != bytes32(0), "Game key cannot be empty");
         require(secret != bytes32(0), SECRET_EMPTY_MSG);
-        require(move > 0 && move < 4, INVALID_MOVE_MSG);
+        require(Moves(move) > Moves.EMPTY, INVALID_MOVE_MSG);
 
-        return keccak256(abi.encodePacked(player, gameKey, secret, move));
+        return keccak256(abi.encodePacked(player, gameKey, secret, uint256(move)));
     }
 
     function pause() public onlyOwner {

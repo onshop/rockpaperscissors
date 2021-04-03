@@ -19,7 +19,7 @@ contract('rcp', async accounts => {
     const RIGHTWIN = "2";
     const INCORRECT = "3";
 
-    const INIT = "0";
+    const UNSTARTED = "0";
     const PLAYER_ONE_MOVE = "1";
     const PLAYER_TWO_MOVE = "2";
     const PLAYER_ONE_REVEAL = "3";
@@ -34,7 +34,7 @@ contract('rcp', async accounts => {
     const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
     const ZERO_BYTES_32 = "0x0000000000000000000000000000000000000000000000000000000000000000";
     const DAY_24_HOUR_IN_SECS = 86400;
-    const TIMEOUT = 11000000
+    const TIMEOUT = 13000000
 
     const getBlockTimeStamp = async(txObj) => {
 
@@ -59,8 +59,6 @@ contract('rcp', async accounts => {
 
     beforeEach("Deploy and prepare", async function() {
         rcp = await Game.new({from: contractOwner});
-        const snapShot = await timeMachine.takeSnapshot();
-        snapshotId = snapShot['result'];
     });
 
     afterEach(async() => {
@@ -106,7 +104,7 @@ contract('rcp', async accounts => {
             assert.strictEqual(initPlayerOneOwed.toString(10), "0");
 
             // 7 - 5 = 2 is added to the balance
-            await rcp.movePlayerOne(gameKey, "5", {from: playerOne, value: toBN(7)});
+            await rcp.movePlayerOne(gameKey, "5", {from: playerOne, value: 7});
 
             const playerOneOwed1 = await rcp.balances(playerOne);
             assert.strictEqual(playerOneOwed1.toString(10), "2");
@@ -155,7 +153,6 @@ contract('rcp', async accounts => {
 
         });
     });
-
     describe("Player reveals", async () => {
 
         it("Player one reveals", async () => {
@@ -210,7 +207,7 @@ contract('rcp', async accounts => {
             },'GamePayment event is emitted');
 
             const game = await rcp.games(gameKey);
-            assert.strictEqual(game.stake.toString(10), INIT);
+            assert.strictEqual(game.stake.toString(10), UNSTARTED);
             assert.strictEqual(game.playerOne, playerOne);
             assert.strictEqual(game.playerTwo, ZERO_ADDRESS);
             assert.strictEqual(game.playerTwoMoveHash, ZERO_BYTES_32);
@@ -256,6 +253,15 @@ contract('rcp', async accounts => {
     });
 
     describe("Player collects forfeit", async () => {
+
+        beforeEach("Deploy and prepare", async function() {
+            const snapShot = await timeMachine.takeSnapshot();
+            snapshotId = snapShot['result'];
+        });
+
+        afterEach(async() => {
+            await timeMachine.revertToSnapshot(snapshotId);
+        });
 
         it("Player one does not reveal and player two collects forfeit", async () => {
 
@@ -306,7 +312,7 @@ contract('rcp', async accounts => {
             assert.strictEqual(playerOneOwed.toString(10), "20");
             assert.strictEqual(playerTwoOwed.toString(10), "0");
 
-        }).tim;
+        }).timeout(TIMEOUT);
     });
 
     it("Player two can stake their winnings in a subsequent game", async () => {
@@ -413,7 +419,8 @@ contract('rcp', async accounts => {
                 rcp.movePlayerOne(ZERO_BYTES_32, "10", {from: playerOne, value: 10}),
                 "Game key hash is empty"
             );
-        });
+
+        }).timeout(TIMEOUT);
 
         it("Call reverts when player one moves with a game key already in use", async () => {
 
@@ -425,7 +432,8 @@ contract('rcp', async accounts => {
                 rcp.movePlayerOne(gameKey, "10", {from: playerOne, value: 10}),
                 INVALID_MOVE_MSG
             );
-        });
+
+        }).timeout(TIMEOUT);
 
         it("Call reverts when player one moves with insufficient funds", async () => {
 
@@ -435,7 +443,8 @@ contract('rcp', async accounts => {
                 rcp.movePlayerOne(gameKey, "10", {from: playerOne, value: toBN(9)}),
                 "Insufficient balance"
             );
-        });
+
+        }).timeout(TIMEOUT);
     });
 
     describe('Player two move validation', async function() {
@@ -459,7 +468,8 @@ contract('rcp', async accounts => {
                 rcp.movePlayerTwo(gameKey, playerTwoMoveHash, {from: playerTwo, value: 10}),
                 INVALID_STEP_MSG
             );
-        });
+
+        }).timeout(TIMEOUT);
 
         it("Call reverts when player two moves with insufficient funds", async () => {
 
@@ -471,7 +481,8 @@ contract('rcp', async accounts => {
                 rcp.movePlayerTwo(gameKey, playerTwoMoveHash, {from: playerTwo, value: toBN(9)}),
                 "Insufficient balance"
             );
-        });
+
+        }).timeout(TIMEOUT);
 
     });
 
@@ -505,6 +516,8 @@ contract('rcp', async accounts => {
            
         }).timeout(TIMEOUT);
 
+
+
         it("Call reverts when an invalid move is used for the player one reveal", async () => {
 
             const gameKey = await rcp.createPlayerOneMoveHash(playerOne, playerOneSecretBytes32, ROCK);
@@ -516,11 +529,7 @@ contract('rcp', async accounts => {
                 rcp.revealPlayerOne(playerOneSecretBytes32, 0, {from: playerOne}),
                 INVALID_MOVE_MSG
             );
-            await truffleAssert.reverts(
-                rcp.revealPlayerOne(playerOneSecretBytes32, "4", {from: playerOne}),
-                INVALID_MOVE_MSG
-            );
-        });
+        }).timeout(TIMEOUT);
     });
 
     describe('Player two reveal validation', async function() {
@@ -537,7 +546,8 @@ contract('rcp', async accounts => {
                 rcp.revealPlayerTwo(gameKey, playerTwoSecretBytes32, SCISSORS, {from: playerThree}),
                 HASH_MISMATCH_MSG
             );
-        });
+
+        }).timeout(TIMEOUT);
 
         it("Call reverts when an invalid secret is used for the player two reveal", async () => {
 
@@ -551,7 +561,8 @@ contract('rcp', async accounts => {
                 rcp.revealPlayerTwo(gameKey, wrongSecretBytes32, ROCK, {from: playerTwo}),
                 HASH_MISMATCH_MSG
             );
-        });
+
+        }).timeout(TIMEOUT);
 
         it("Call reverts when an invalid move is used for the player two reveal", async () => {``
 
@@ -565,16 +576,20 @@ contract('rcp', async accounts => {
                 rcp.revealPlayerTwo(gameKey, playerTwoSecretBytes32, 0, {from: playerTwo}),
                 INVALID_MOVE_MSG
             );
-            await truffleAssert.reverts(
-                rcp.revealPlayerTwo(gameKey, playerTwoSecretBytes32, "4", {from: playerTwo}),
-                INVALID_MOVE_MSG
-            );
 
         }).timeout(TIMEOUT);
     });
 
-
     describe('Player collects forfeit validation', async function() {
+
+        beforeEach("Deploy and prepare", async function() {
+            const snapShot = await timeMachine.takeSnapshot();
+            snapshotId = snapShot['result'];
+        });
+
+        afterEach(async() => {
+            await timeMachine.revertToSnapshot(snapshotId);
+        });
 
         it("Call reverts when player one collects forfeit before player one reveals", async () => {
 
@@ -684,11 +699,7 @@ contract('rcp', async accounts => {
                 rcp.createPlayerOneMoveHash(playerOne, playerOneSecretBytes32, 0),
                 INVALID_MOVE_MSG
             );
-            await truffleAssert.reverts(
-                rcp.createPlayerOneMoveHash(playerOne, playerOneSecretBytes32, toBN(4)),
-                INVALID_MOVE_MSG
-            );
-        });
+        }).timeout(TIMEOUT);
 
         it("Call reverts when player two creates a move hash with a zero bytes game key", async () => {
 
@@ -716,15 +727,20 @@ contract('rcp', async accounts => {
                 rcp.createPlayerTwoMoveHash(playerOne, gameKey, playerTwoSecretBytes32, 0),
                 INVALID_MOVE_MSG
             );
-            await truffleAssert.reverts(
-                rcp.createPlayerTwoMoveHash(playerOne, gameKey, playerTwoSecretBytes32, toBN(4)),
-                INVALID_MOVE_MSG
-            );
             
         }).timeout(TIMEOUT);
     });
 
     describe('Checking pausible functions can be paused', async function() {
+
+        beforeEach("Deploy and prepare", async function() {
+            const snapShot = await timeMachine.takeSnapshot();
+            snapshotId = snapShot['result'];
+        });
+
+        afterEach(async() => {
+            await timeMachine.revertToSnapshot(snapshotId);
+        });
 
        it("Player one move is pausable and unpausable", async () => {
 
@@ -842,6 +858,7 @@ contract('rcp', async accounts => {
             const txObj = await rcp.playerTwoCollectsForfeit(gameKey, {from: playerTwo});
             await truffleAssert.eventEmitted(txObj, 'ForfeitPaid');
             
-        }).timeout(TIMEOUT);
+        }).timeout(TIMEOUT)
     });
+
 });
