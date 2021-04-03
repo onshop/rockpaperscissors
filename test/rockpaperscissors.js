@@ -31,15 +31,13 @@ contract('rcp', async accounts => {
     const SECRET_EMPTY_MSG = "Secret is empty";
     const INVALID_PLAYER_MSG = "Invalid player";
 
-    const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
-    const ZERO_BYTES_32 = "0x0000000000000000000000000000000000000000000000000000000000000000";
+    const ZERO_ADDRESS = "0x".padEnd(42, "0");;
+    const ZERO_BYTES_32 = "0x".padEnd(66, "0");;
     const DAY_24_HOUR_IN_SECS = 86400;
     const TIMEOUT = 14000000
 
     const getBlockTimeStamp = async(txObj) => {
-
-        const tx = await getTransaction(txObj.tx);
-        const blockData = await web3.eth.getBlock(tx.blockNumber)
+        const blockData = await web3.eth.getBlock(txObj.receipt.blockNumber);
 
         return blockData.timestamp;
     }
@@ -61,9 +59,6 @@ contract('rcp', async accounts => {
         rcp = await Game.new({from: contractOwner});
     });
 
-    afterEach(async() => {
-        await timeMachine.revertToSnapshot(snapshotId);
-    });
     describe("Player moves", async () => {
 
       it("Player one hashes their address, secret and move", async () => {
