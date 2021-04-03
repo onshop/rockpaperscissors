@@ -37,7 +37,7 @@ contract RockPaperScissors is Ownable, Pausable {
         RIGHTWIN, // 2
         INCORRECT // 3
     }
-    GameResult public moves;
+    GameResult public gameResult;
 
     struct Game {
         uint8 step;
@@ -118,7 +118,7 @@ contract RockPaperScissors is Ownable, Pausable {
 
         game.stake = stake;
         game.playerOne = msg.sender;
-        game.step = Steps.PLAYER_ONE_MOVE;
+        game.step = uint8(Steps.PLAYER_ONE_MOVE);
         depositStake(stake);
 
         emit PlayerOneMoves(gameKey, msg.sender, stake, msg.value);
@@ -133,7 +133,7 @@ contract RockPaperScissors is Ownable, Pausable {
         uint256 expiryDate = block.timestamp.add(FORFEIT_WINDOW);
         game.playerTwo = msg.sender;
         game.playerTwoMoveHash = moveHash;
-        game.step = Steps.PLAYER_TWO_MOVE;
+        game.step = uint8(Steps.PLAYER_TWO_MOVE);
         game.expiryDate = expiryDate;
         depositStake(game.stake);
 
@@ -163,7 +163,7 @@ contract RockPaperScissors is Ownable, Pausable {
 
         uint256 expiryDate = block.timestamp.add(FORFEIT_WINDOW);
         game.playerOneMove = uint8(playerOneMove);
-        game.step = Steps.PLAYER_ONE_REVEAL;
+        game.step = uint8(Steps.PLAYER_ONE_REVEAL);
         game.expiryDate = expiryDate;
 
         emit PlayerOneReveals(gameKey, msg.sender, uint8(playerOneMove), expiryDate);
@@ -187,9 +187,9 @@ contract RockPaperScissors is Ownable, Pausable {
         uint8 playerOneMove = game.playerOneMove;
         address winner;
         address loser;
-        uint8 outcome = resolveGame(playerOneMove, playerTwoMove);
+        GameResult outcome = resolveGame(playerOneMove, playerTwoMove);
 
-        if (outcome == uint8(GameResult.DRAW)) {
+        if (outcome == GameResult.DRAW) {
             resetGame(game);
             balances[playerOne] = balances[playerOne].add(stake);
             balances[playerTwo] = balances[playerTwo].add(stake);
@@ -197,10 +197,10 @@ contract RockPaperScissors is Ownable, Pausable {
 
             return;
 
-        } else if (outcome == uint8(GameResult.LEFTWIN)) {
+        } else if (outcome == GameResult.LEFTWIN) {
             winner = playerOne;
             loser = playerTwo;
-        } else if (outcome == uint8(GameResult.RIGHTWIN)) {
+        } else if (outcome == GameResult.RIGHTWIN) {
             winner = playerTwo;
             loser = playerOne;
         } else {
@@ -213,13 +213,13 @@ contract RockPaperScissors is Ownable, Pausable {
         resetGame(game);
     }
 
-    function resolveGame(uint8 leftPlayer, uint8 rightPlayer) public pure returns(uint8) {
+    function resolveGame(uint8 leftPlayer, uint8 rightPlayer) public pure returns(GameResult) {
 
         if (leftPlayer == 0 || leftPlayer > 3 || rightPlayer == 0 || rightPlayer > 3) {
-            return uint8(GameResult.INCORRECT);
+            return GameResult.INCORRECT;
         }
 
-        return uint8(GameResult((uint256(leftPlayer).add(3).sub(uint256(rightPlayer))).mod(3)));
+        return GameResult((uint256(leftPlayer).add(3).sub(uint256(rightPlayer))).mod(3));
     }
 
     function playerOneCollectsForfeit(bytes32 gameKey) whenNotPaused external whenNotPaused {
@@ -271,7 +271,6 @@ contract RockPaperScissors is Ownable, Pausable {
 
         uint256 withdrawerBalance = balances[msg.sender];
         require(amount > 0, "The value must be greater than 0");
-        require(withdrawerBalance >= amount, "There are insufficient funds");
 
         balances[msg.sender] = withdrawerBalance.sub(amount);
         emit WithDraw(msg.sender, amount);
