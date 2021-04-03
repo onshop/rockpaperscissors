@@ -34,7 +34,7 @@ contract('rcp', async accounts => {
     const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
     const ZERO_BYTES_32 = "0x0000000000000000000000000000000000000000000000000000000000000000";
     const DAY_24_HOUR_IN_SECS = 86400;
-    const TIMEOUT = 7000000
+    const TIMEOUT = 11000000
 
     const getBlockTimeStamp = async(txObj) => {
 
@@ -223,7 +223,8 @@ contract('rcp', async accounts => {
 
             assert.strictEqual(playerOneOwed.toString(10), "0");
             assert.strictEqual(playerTwoOwed.toString(10), "20");
-        });
+
+        }).timeout(TIMEOUT);
 
         it("Player two reveals and the game is a draw", async () => {
 
@@ -250,7 +251,8 @@ contract('rcp', async accounts => {
 
             assert.strictEqual(playerOneOwed.toString(10), "10");
             assert.strictEqual(playerTwoOwed.toString(10), "10");
-        });
+
+        }).timeout(TIMEOUT);
     });
 
     describe("Player collects forfeit", async () => {
@@ -304,7 +306,7 @@ contract('rcp', async accounts => {
             assert.strictEqual(playerOneOwed.toString(10), "20");
             assert.strictEqual(playerTwoOwed.toString(10), "0");
 
-        });
+        }).tim;
     });
 
     it("Player two can stake their winnings in a subsequent game", async () => {
@@ -486,7 +488,8 @@ contract('rcp', async accounts => {
                 rcp.revealPlayerOne(playerOneSecretBytes32, ROCK, {from: playerThree}),
                 INVALID_STEP_MSG
             );
-        });
+
+        }).timeout(TIMEOUT);
 
         it("Call reverts when an invalid secret is used for the player one reveal", async () => {
 
@@ -795,7 +798,8 @@ contract('rcp', async accounts => {
             await rcp.unpause({from: contractOwner});
             const txObj = await rcp.revealPlayerTwo(gameKey, playerTwoSecretBytes32, PAPER, {from: playerTwo});
             await truffleAssert.eventEmitted(txObj, 'PlayerTwoReveals');
-        });
+
+        }).timeout(TIMEOUT);
 
         it("Player one collecting forfeit is pausable and unpausable", async () => {
 
