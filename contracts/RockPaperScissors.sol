@@ -182,7 +182,7 @@ contract RockPaperScissors is Ownable, Pausable {
 
     function revealPlayerTwo(bytes32 gameKey, bytes32 secret, Moves playerTwoMove) external whenNotPaused {
 
-        require(playerOneMove >= Moves.ROCK, INVALID_MOVE_MSG);
+        require(playerTwoMove >= Moves.ROCK, INVALID_MOVE_MSG);
         Game storage game = games[gameKey];
         require(game.step == Steps.PLAYER_ONE_REVEALED, INVALID_STEP_MSG);
         address playerTwo = game.playerTwo;
@@ -197,7 +197,7 @@ contract RockPaperScissors is Ownable, Pausable {
         address playerOne = game.playerOne;
         address winner;
         address loser;
-        GameResult outcome = resolveGame(uint8(game.playerOneMove), uint8(playerTwoMove));
+        GameResult outcome = resolveGame(game.playerOneMove, playerTwoMove);
 
         if (outcome == GameResult.DRAW) {
             resetGame(game);
@@ -223,15 +223,9 @@ contract RockPaperScissors is Ownable, Pausable {
         resetGame(game);
     }
 
-    // Type hinted uint8 because GameResult.INCORRECT will never be returned if Moves enum is used
-    // If the value is out of bounds then an exception will be thrown
-    function resolveGame(uint8 leftPlayer, uint8 rightPlayer) public pure returns(GameResult) {
+    function resolveGame(Moves leftPlayer, Moves rightPlayer) public pure returns(GameResult) {
 
-        if (leftPlayer < uint8(Moves.ROCK) || leftPlayer > uint8(Moves.SCISSORS)) {
-            return GameResult.INCORRECT;
-        }
-
-        if (rightPlayer < uint8(Moves.ROCK) || rightPlayer > uint8(Moves.SCISSORS)) {
+        if (leftPlayer == Moves.EMPTY || rightPlayer == Moves.EMPTY){
             return GameResult.INCORRECT;
         }
 

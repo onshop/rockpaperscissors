@@ -404,10 +404,10 @@ contract('rcp', async accounts => {
         });
 
         it("Game outcome calculated and move values validated", async () => {
-            const errorResultLeft1 = await rcp.resolveGame(4, 0);
+            const errorResultLeft1 = await rcp.resolveGame(2, 0);
             assert.strictEqual(errorResultLeft1.toString(10), INCORRECT);
 
-            const errorResultLeft2 = await rcp.resolveGame(0, 4);
+            const errorResultLeft2 = await rcp.resolveGame(0, 2);
             assert.strictEqual(errorResultLeft2.toString(10), INCORRECT);
         });
     });
