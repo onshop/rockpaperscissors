@@ -303,7 +303,7 @@ contract RockPaperScissors is Ownable, Pausable {
     function createPlayerOneMoveHash(address player, bytes32 secret, Moves move) public pure returns(bytes32) {
 
         require(secret != bytes32(0), SECRET_EMPTY_MSG);
-        require(Moves(move) > Moves.EMPTY, INVALID_MOVE_MSG);
+        require(move > Moves.EMPTY, INVALID_MOVE_MSG);
 
         return keccak256(abi.encodePacked(player, secret, uint256(move)));
     }
