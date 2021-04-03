@@ -64,7 +64,6 @@ contract('rcp', async accounts => {
     afterEach(async() => {
         await timeMachine.revertToSnapshot(snapshotId);
     });
-
     describe("Player moves", async () => {
 
       it("Player one hashes their address, secret and move", async () => {
@@ -153,6 +152,7 @@ contract('rcp', async accounts => {
 
         });
     });
+
     describe("Player reveals", async () => {
 
         it("Player one reveals", async () => {

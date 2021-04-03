@@ -165,7 +165,7 @@ contract RockPaperScissors is Ownable, Pausable {
 
     function revealPlayerOne(bytes32 secret, Moves playerOneMove) external whenNotPaused {
 
-        require(Moves(playerOneMove) >= Moves.ROCK, INVALID_MOVE_MSG);
+        require(playerOneMove >= Moves.ROCK, INVALID_MOVE_MSG);
         bytes32 gameKey = createPlayerOneMoveHash(msg.sender, secret, Moves(playerOneMove));
         Game storage game = games[gameKey];
 
@@ -177,18 +177,18 @@ contract RockPaperScissors is Ownable, Pausable {
 
         game.playerOneMove = Moves(playerOneMove);
 
-        emit PlayerOneReveals(gameKey, msg.sender, Moves(playerOneMove), expiryDate);
+        emit PlayerOneReveals(gameKey, msg.sender, playerOneMove, expiryDate);
     }
 
     function revealPlayerTwo(bytes32 gameKey, bytes32 secret, Moves playerTwoMove) external whenNotPaused {
 
-        require(Moves(playerTwoMove) > Moves.EMPTY && Moves(playerTwoMove) <= Moves.SCISSORS, INVALID_MOVE_MSG);
+        require(playerTwoMove > Moves.EMPTY, INVALID_MOVE_MSG);
         Game storage game = games[gameKey];
         require(game.step == Steps.PLAYER_ONE_REVEALED, INVALID_STEP_MSG);
         address playerTwo = game.playerTwo;
 
         //Validate move
-        bytes32 expectedMoveHash = createPlayerTwoMoveHash(msg.sender, gameKey, secret, Moves(playerTwoMove));
+        bytes32 expectedMoveHash = createPlayerTwoMoveHash(msg.sender, gameKey, secret, playerTwoMove);
         require(game.playerTwoMoveHash == expectedMoveHash, HASH_MISMATCH_MSG);
 
         emit PlayerTwoReveals(gameKey, msg.sender, Moves(playerTwoMove));
