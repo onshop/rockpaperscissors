@@ -118,7 +118,7 @@ contract RockPaperScissors is Ownable, Pausable {
 
         game.stake = stake;
         game.playerOne = msg.sender;
-        game.step = uint8(Steps.PLAYER_ONE_MOVE);
+        game.step = Steps.PLAYER_ONE_MOVE;
         depositStake(stake);
 
         emit PlayerOneMoves(gameKey, msg.sender, stake, msg.value);
@@ -133,7 +133,7 @@ contract RockPaperScissors is Ownable, Pausable {
         uint256 expiryDate = block.timestamp.add(FORFEIT_WINDOW);
         game.playerTwo = msg.sender;
         game.playerTwoMoveHash = moveHash;
-        game.step = uint8(Steps.PLAYER_TWO_MOVE);
+        game.step = Steps.PLAYER_TWO_MOVE;
         game.expiryDate = expiryDate;
         depositStake(game.stake);
 
@@ -163,7 +163,7 @@ contract RockPaperScissors is Ownable, Pausable {
 
         uint256 expiryDate = block.timestamp.add(FORFEIT_WINDOW);
         game.playerOneMove = uint8(playerOneMove);
-        game.step = uint8(Steps.PLAYER_ONE_REVEAL);
+        game.step = Steps.PLAYER_ONE_REVEAL;
         game.expiryDate = expiryDate;
 
         emit PlayerOneReveals(gameKey, msg.sender, uint8(playerOneMove), expiryDate);
