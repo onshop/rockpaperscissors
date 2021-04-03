@@ -40,7 +40,7 @@ contract RockPaperScissors is Ownable, Pausable {
     GameResult public gameResult;
 
     struct Game {
-        uint8 step;
+        Steps step;
         address playerOne;
         uint8 playerOneMove;
         uint256 stake;
@@ -113,12 +113,12 @@ contract RockPaperScissors is Ownable, Pausable {
 
         require(gameKey != bytes32(0), "Game key hash is empty");
         Game storage game = games[gameKey];
-        require(game.step == uint8(Steps.INIT), INVALID_STEP_MSG);
+        require(game.step == Steps.INIT, INVALID_STEP_MSG);
         require(game.playerOne == NULL_ADDRESS, INVALID_MOVE_MSG);
 
         game.stake = stake;
         game.playerOne = msg.sender;
-        game.step = uint8(Steps.PLAYER_ONE_MOVE);
+        game.step = Steps.PLAYER_ONE_MOVE;
         depositStake(stake);
 
         emit PlayerOneMoves(gameKey, msg.sender, stake, msg.value);
@@ -128,12 +128,12 @@ contract RockPaperScissors is Ownable, Pausable {
 
         require(moveHash != bytes32(0), "Move hash is empty");
         Game storage game = games[gameKey];
-        require(game.step == uint8(Steps.PLAYER_ONE_MOVE), INVALID_STEP_MSG);
+        require(game.step == Steps.PLAYER_ONE_MOVE, INVALID_STEP_MSG);
 
         uint256 expiryDate = block.timestamp.add(FORFEIT_WINDOW);
         game.playerTwo = msg.sender;
         game.playerTwoMoveHash = moveHash;
-        game.step = uint8(Steps.PLAYER_TWO_MOVE);
+        game.step = Steps.PLAYER_TWO_MOVE;
         game.expiryDate = expiryDate;
         depositStake(game.stake);
 
@@ -159,11 +159,11 @@ contract RockPaperScissors is Ownable, Pausable {
         require(playerOneMove > 0 && playerOneMove < 4, INVALID_MOVE_MSG);
         bytes32 gameKey = createPlayerOneMoveHash(msg.sender, secret, playerOneMove);
         Game storage game = games[gameKey];
-        require(game.step == uint8(Steps.PLAYER_TWO_MOVE), INVALID_STEP_MSG);
+        require(game.step == Steps.PLAYER_TWO_MOVE, INVALID_STEP_MSG);
 
         uint256 expiryDate = block.timestamp.add(FORFEIT_WINDOW);
         game.playerOneMove = uint8(playerOneMove);
-        game.step = uint8(Steps.PLAYER_ONE_REVEAL);
+        game.step = Steps.PLAYER_ONE_REVEAL;
         game.expiryDate = expiryDate;
 
         emit PlayerOneReveals(gameKey, msg.sender, uint8(playerOneMove), expiryDate);
@@ -173,7 +173,7 @@ contract RockPaperScissors is Ownable, Pausable {
 
         require(playerTwoMove > 0 && playerTwoMove < 4, INVALID_MOVE_MSG);
         Game storage game = games[gameKey];
-        require(game.step == uint8(Steps.PLAYER_ONE_REVEAL), INVALID_STEP_MSG);
+        require(game.step == Steps.PLAYER_ONE_REVEAL, INVALID_STEP_MSG);
         address playerTwo = game.playerTwo;
 
         //Validate move
@@ -225,7 +225,7 @@ contract RockPaperScissors is Ownable, Pausable {
     function playerOneCollectsForfeit(bytes32 gameKey) whenNotPaused external whenNotPaused {
 
         Game storage game = games[gameKey];
-        require(game.step == uint8(Steps.PLAYER_ONE_REVEAL), INVALID_STEP_MSG);
+        require(game.step == Steps.PLAYER_ONE_REVEAL, INVALID_STEP_MSG);
         address playerOne = game.playerOne;
         require(msg.sender == playerOne, INVALID_PLAYER_MSG);
 
@@ -241,7 +241,7 @@ contract RockPaperScissors is Ownable, Pausable {
     function playerTwoCollectsForfeit(bytes32 gameKey) whenNotPaused external whenNotPaused {
 
         Game storage game = games[gameKey];
-        require(game.step == uint8(Steps.PLAYER_TWO_MOVE), INVALID_STEP_MSG);
+        require(game.step == Steps.PLAYER_TWO_MOVE, INVALID_STEP_MSG);
         address playerTwo = game.playerTwo;
         require(msg.sender == playerTwo, INVALID_PLAYER_MSG);
         require(block.timestamp >= game.expiryDate, GAME_NOT_EXPIRED_MSG);
@@ -256,7 +256,7 @@ contract RockPaperScissors is Ownable, Pausable {
     function playerOneEndsGame(bytes32 gameKey) whenNotPaused external whenNotPaused {
 
         Game storage game = games[gameKey];
-        require(game.step == uint8(Steps.PLAYER_ONE_MOVE), INVALID_STEP_MSG);
+        require(game.step == Steps.PLAYER_ONE_MOVE, INVALID_STEP_MSG);
         address playerOne = game.playerOne;
         require(msg.sender == playerOne, INVALID_PLAYER_MSG);
 
@@ -287,7 +287,7 @@ contract RockPaperScissors is Ownable, Pausable {
         game.playerTwoMoveHash = bytes32(0);
         game.playerOneMove = 0;
         game.expiryDate = 0;
-        game.step = 0;
+        game.step = Steps.INIT;
     }
 
     // This can only be used once because it is used as a mapping key
