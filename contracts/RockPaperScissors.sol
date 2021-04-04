@@ -8,6 +8,7 @@ import {SafeMath} from "./math/SafeMath.sol";
 
 contract RockPaperScissors is Ownable, Pausable {
 
+    using SafeMath for Moves;
     using SafeMath for uint256;
 
     mapping(address => uint256) public balances;
@@ -229,7 +230,7 @@ contract RockPaperScissors is Ownable, Pausable {
             return GameResult.INCORRECT;
         }
 
-        return GameResult((uint256(leftPlayer).add(3).sub(uint256(rightPlayer))).mod(3));
+        return GameResult((leftPlayer.add(3).sub(rightPlayer)).mod(3));
     }
 
     function playerOneCollectsForfeit(bytes32 gameKey) whenNotPaused external whenNotPaused {
