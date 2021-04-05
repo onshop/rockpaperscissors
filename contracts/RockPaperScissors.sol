@@ -8,7 +8,7 @@ import {SafeMath} from "./math/SafeMath.sol";
 
 contract RockPaperScissors is Ownable, Pausable {
 
-    using SafeMath for Moves;
+    using SafeMath for uint8;
     using SafeMath for uint256;
 
     mapping(address => uint256) public balances;
@@ -230,7 +230,7 @@ contract RockPaperScissors is Ownable, Pausable {
             return GameResult.INCORRECT;
         }
 
-        return GameResult((leftPlayer.add(3).sub(rightPlayer)).mod(3));
+        return GameResult((uint8(leftPlayer).add(3).sub(uint8(rightPlayer))).mod(3));
     }
 
     function playerOneCollectsForfeit(bytes32 gameKey) whenNotPaused external whenNotPaused {
@@ -306,7 +306,7 @@ contract RockPaperScissors is Ownable, Pausable {
         require(secret != bytes32(0), SECRET_EMPTY_MSG);
         require(move > Moves.EMPTY, INVALID_MOVE_MSG);
 
-        return keccak256(abi.encodePacked(player, secret, uint256(move)));
+        return keccak256(abi.encodePacked(player, secret, move));
     }
 
     // Even if the secret is reused, the hash will always be unique because the game key will be unique
@@ -316,7 +316,7 @@ contract RockPaperScissors is Ownable, Pausable {
         require(secret != bytes32(0), SECRET_EMPTY_MSG);
         require(Moves(move) > Moves.EMPTY, INVALID_MOVE_MSG);
 
-        return keccak256(abi.encodePacked(player, gameKey, secret, uint256(move)));
+        return keccak256(abi.encodePacked(player, gameKey, secret, move));
     }
 
     function pause() public onlyOwner {

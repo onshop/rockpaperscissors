@@ -31,8 +31,8 @@ contract('rcp', async accounts => {
     const SECRET_EMPTY_MSG = "Secret is empty";
     const INVALID_PLAYER_MSG = "Invalid player";
 
-    const ZERO_ADDRESS = "0x".padEnd(42, "0");;
-    const ZERO_BYTES_32 = "0x".padEnd(66, "0");;
+    const ZERO_ADDRESS = "0x".padEnd(42, "0");
+    const ZERO_BYTES_32 = "0x".padEnd(66, "0");
     const DAY_24_HOUR_IN_SECS = 86400;
     const TIMEOUT = 14000000
 
@@ -61,9 +61,9 @@ contract('rcp', async accounts => {
 
     describe("Player moves", async () => {
 
-      it("Player one hashes their address, secret and move", async () => {
+        it("Player one hashes their address, secret and move", async () => {
             const gameKey = await rcp.createPlayerOneMoveHash(playerOne, playerOneSecretBytes32, ROCK);
-            const expectedMoveHash =  await soliditySha3(playerOne, playerOneSecretBytes32, ROCK);
+            const expectedMoveHash =  await soliditySha3(playerOne, playerOneSecretBytes32, {type: 'uint8', value: ROCK});
             assert.strictEqual(expectedMoveHash, gameKey);
         });
 
@@ -113,10 +113,10 @@ contract('rcp', async accounts => {
 
         });
 
-      it("Player two hashes their address, game key, secret and move", async () => {
+        it("Player two hashes their address, game key, secret and move", async () => {
             const gameKey = await rcp.createPlayerOneMoveHash(playerOne, playerOneSecretBytes32, ROCK);
             const playerTwoMoveHash = await rcp.createPlayerTwoMoveHash(playerTwo, gameKey, playerTwoSecretBytes32, SCISSORS);
-            const expectedMoveHash =  await soliditySha3(playerTwo, gameKey, playerTwoSecretBytes32, SCISSORS);
+            const expectedMoveHash =  await soliditySha3(playerTwo, gameKey, playerTwoSecretBytes32, { type: "uint8", value: SCISSORS });
             assert.strictEqual(expectedMoveHash, playerTwoMoveHash);
         });
 
@@ -859,5 +859,4 @@ contract('rcp', async accounts => {
             
         }).timeout(TIMEOUT)
     });
-
 });
