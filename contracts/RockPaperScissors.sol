@@ -50,11 +50,11 @@ contract RockPaperScissors is Ownable, Pausable {
     Moves public moves;
 
     struct Game {
-        Steps step;
         address playerOne;
         Moves playerOneMove;
         uint256 stake;
         uint256 expiryDate;
+        Steps step;
         address playerTwo;
         bytes32 playerTwoMoveHash;
     }
