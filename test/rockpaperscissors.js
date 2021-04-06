@@ -429,14 +429,13 @@ contract('rcp', async accounts => {
             );
 
         }).timeout(TIMEOUT);
-
         it("Call reverts when player one moves with insufficient funds", async () => {
 
             const gameKey = await rcp.createPlayerOneMoveHash(playerOne, playerOneSecretBytes32, SCISSORS);
 
             await truffleAssert.reverts(
                 rcp.movePlayerOne(gameKey, "10", {from: playerOne, value: toBN(9)}),
-                "Insufficient balance"
+                "SafeMath: subtraction overflow"
             );
 
         }).timeout(TIMEOUT);
@@ -474,13 +473,12 @@ contract('rcp', async accounts => {
 
             await truffleAssert.reverts(
                 rcp.movePlayerTwo(gameKey, playerTwoMoveHash, {from: playerTwo, value: toBN(9)}),
-                "Insufficient balance"
+                "SafeMath: subtraction overflow"
             );
 
         }).timeout(TIMEOUT);
 
     });
-
     describe('Player one reveal validation', async function() {
 
         it("Call reverts when an invalid address calls player one reveal", async () => {
