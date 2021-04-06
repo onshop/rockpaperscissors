@@ -687,6 +687,7 @@ contract('rcp', async accounts => {
                 rcp.playerTwoCollectsForfeit(gameKey, {from: playerTwo}),
                 GAME_NOT_EXPIRED_MSG
             );
+
         }).timeout(TIMEOUT);
     });
 
@@ -713,7 +714,7 @@ contract('rcp', async accounts => {
                 truffleAssert.ErrorType.INVALID_OPCODE
             );
 
-        });
+        }).timeout(TIMEOUT);
 
         it("Call reverts when player two creates a move hash with a zero bytes game key", async () => {
 
