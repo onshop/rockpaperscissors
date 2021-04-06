@@ -123,7 +123,6 @@ contract RockPaperScissors is Ownable, Pausable {
 
         require(gameKey != bytes32(0), "Game key hash is empty");
         Game storage game = games[gameKey];
-        require(game.step == Steps.UNSTARTED, INVALID_STEP_MSG);
         require(game.playerOne == NULL_ADDRESS, INVALID_MOVE_MSG);
 
         game.playerOne = msg.sender;
