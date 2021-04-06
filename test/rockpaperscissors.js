@@ -524,6 +524,12 @@ contract('rcp', async accounts => {
                 rcp.revealPlayerOne(playerOneSecretBytes32, 0, {from: playerOne}),
                 INVALID_MOVE_MSG
             );
+
+            await truffleAssert.fails(
+                rcp.revealPlayerOne(playerOneSecretBytes32, toBN(4), {from: playerOne}),
+                truffleAssert.ErrorType.INVALID_OPCODE
+            );
+
         }).timeout(TIMEOUT);
     });
 
@@ -570,6 +576,11 @@ contract('rcp', async accounts => {
             await truffleAssert.reverts(
                 rcp.revealPlayerTwo(gameKey, playerTwoSecretBytes32, 0, {from: playerTwo}),
                 INVALID_MOVE_MSG
+            );
+
+            await truffleAssert.fails(
+                rcp.revealPlayerTwo(gameKey, playerTwoSecretBytes32, toBN(4), {from: playerTwo}),
+                truffleAssert.ErrorType.INVALID_OPCODE
             );
 
         }).timeout(TIMEOUT);
@@ -696,7 +707,13 @@ contract('rcp', async accounts => {
                 rcp.createPlayerOneMoveHash(playerOne, playerOneSecretBytes32, 0),
                 INVALID_MOVE_MSG
             );
-        }).timeout(TIMEOUT);
+
+            await truffleAssert.fails(
+                rcp.createPlayerOneMoveHash(playerOne, playerOneSecretBytes32, toBN(4)),
+                truffleAssert.ErrorType.INVALID_OPCODE
+            );
+
+        });
 
         it("Call reverts when player two creates a move hash with a zero bytes game key", async () => {
 
@@ -726,7 +743,12 @@ contract('rcp', async accounts => {
                 rcp.createPlayerTwoMoveHash(playerOne, gameKey, playerTwoSecretBytes32, 0),
                 INVALID_MOVE_MSG
             );
-            
+
+            await truffleAssert.fails(
+                rcp.createPlayerTwoMoveHash(playerOne, gameKey, playerTwoSecretBytes32, toBN(4)),
+                truffleAssert.ErrorType.INVALID_OPCODE
+            );
+
         }).timeout(TIMEOUT);
     });
 
