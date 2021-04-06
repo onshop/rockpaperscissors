@@ -126,9 +126,9 @@ contract RockPaperScissors is Ownable, Pausable {
         require(game.step == Steps.UNSTARTED, INVALID_STEP_MSG);
         require(game.playerOne == NULL_ADDRESS, INVALID_MOVE_MSG);
 
-        game.stake = stake;
         game.playerOne = msg.sender;
         game.step = Steps.PLAYER_ONE_MOVED;
+        game.stake = stake;
         depositStake(stake);
 
         emit PlayerOneMoves(gameKey, msg.sender, stake, msg.value);
@@ -141,10 +141,11 @@ contract RockPaperScissors is Ownable, Pausable {
         require(game.step == Steps.PLAYER_ONE_MOVED, INVALID_STEP_MSG);
 
         uint256 expiryDate = block.timestamp.add(FORFEIT_WINDOW);
+        game.expiryDate = expiryDate;
         game.playerTwo = msg.sender;
         game.playerTwoMoveHash = moveHash;
         game.step = Steps.PLAYER_TWO_MOVED;
-        game.expiryDate = expiryDate;
+
         depositStake(game.stake);
 
         emit PlayerTwoMoves(gameKey, msg.sender, msg.value, moveHash, expiryDate);
