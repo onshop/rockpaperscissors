@@ -224,7 +224,7 @@ contract RockPaperScissors is Ownable, Pausable {
         return GameResult((uint8(leftPlayer).add(3).sub(uint8(rightPlayer))).mod(3));
     }
 
-    function playerOneCollectsForfeit(bytes32 gameKey) whenNotPaused external whenNotPaused {
+    function playerOneCollectsForfeit(bytes32 gameKey) external whenNotPaused {
 
         Game storage game = games[gameKey];
         require(game.step == Steps.PLAYER_ONE_REVEALED, INVALID_STEP_MSG);
@@ -239,7 +239,7 @@ contract RockPaperScissors is Ownable, Pausable {
         emit ForfeitPaid(gameKey, playerOne, forfeit);
     }
 
-    function playerTwoCollectsForfeit(bytes32 gameKey) whenNotPaused external whenNotPaused {
+    function playerTwoCollectsForfeit(bytes32 gameKey) external whenNotPaused {
 
         Game storage game = games[gameKey];
         require(game.step == Steps.PLAYER_TWO_MOVED, INVALID_STEP_MSG);
@@ -254,7 +254,7 @@ contract RockPaperScissors is Ownable, Pausable {
         emit ForfeitPaid(gameKey, playerTwo, forfeit);
     }
 
-    function playerOneEndsGame(bytes32 gameKey) whenNotPaused external whenNotPaused {
+    function playerOneEndsGame(bytes32 gameKey) external whenNotPaused {
 
         Game storage game = games[gameKey];
         require(game.step == Steps.PLAYER_ONE_MOVED, INVALID_STEP_MSG);
