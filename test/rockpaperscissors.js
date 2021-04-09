@@ -409,13 +409,13 @@ contract('rcp', async accounts => {
 
     describe('Player one move validation', async function() {
 
-        it("Call reverts when player one moves with an empty hash", async () => {
+/*        it("Call reverts when player one moves with an empty hash", async () => {
             await truffleAssert.reverts(
                 rcp.movePlayerOne(ZERO_BYTES_32, "10", {from: playerOne, value: 10}),
                 "Game key hash is empty"
             );
 
-        }).timeout(TIMEOUT);
+        }).timeout(TIMEOUT);*/
 
         it("Call reverts when player one moves with a game key already in use", async () => {
 
@@ -425,10 +425,11 @@ contract('rcp', async accounts => {
 
             await truffleAssert.reverts(
                 rcp.movePlayerOne(gameKey, "10", {from: playerOne, value: 10}),
-                INVALID_MOVE_MSG
+                "Game key already used"
             );
 
         }).timeout(TIMEOUT);
+
         it("Call reverts when player one moves with insufficient funds", async () => {
 
             const gameKey = await rcp.createPlayerOneMoveHash(playerOne, playerOneSecretBytes32, SCISSORS);
