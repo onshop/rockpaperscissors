@@ -206,7 +206,7 @@ contract RockPaperScissors is Ownable, Pausable {
             winner = playerTwo;
             loser = playerOne;
         } else {
-            assert(outcome == GameResult.RIGHTWIN);
+            assert(false);
         }
         uint256 winnings = stake.mul(2);
         balances[winner] = balances[winner].add(winnings);
