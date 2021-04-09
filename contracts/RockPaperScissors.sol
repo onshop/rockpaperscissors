@@ -18,7 +18,6 @@ contract RockPaperScissors is Ownable, Pausable {
     string private constant INVALID_PLAYER_MSG = "Invalid player";
     string private constant INVALID_MOVE_MSG = "Invalid move";
     string private constant INVALID_STEP_MSG = "Invalid step";
-    string private constant HASH_MISMATCH_MSG = "Move and secret do not match";
     string private constant GAME_NOT_EXPIRED_MSG = "Game has not expired";
     string private constant SECRET_EMPTY_MSG = "Secret is empty";
 
@@ -181,7 +180,7 @@ contract RockPaperScissors is Ownable, Pausable {
 
         //Validate move
         bytes32 expectedMoveHash = createPlayerTwoMoveHash(msg.sender, gameKey, secret, playerTwoMove);
-        require(game.playerTwoMoveHash == expectedMoveHash, HASH_MISMATCH_MSG);
+        require(game.playerTwoMoveHash == expectedMoveHash, "Move and secret do not match");
 
         emit PlayerTwoReveals(gameKey, msg.sender, playerTwoMove);
 
