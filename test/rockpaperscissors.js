@@ -330,47 +330,62 @@ contract('rcp', async accounts => {
 
     }).timeout(TIMEOUT);
 
-    it("Player ends the game early and collects their stake", async () => {
+    describe('Player one ends the game early', async function(){
 
-        const gameKey = await rcp.createPlayerOneMoveHash(playerOne, playerOneSecretBytes32, PAPER);
-        await rcp.movePlayerOne(gameKey, "10", {from: playerOne, value: 10});
-        const txObj = await rcp.playerOneEndsGame(gameKey, {from: playerOne});
+        beforeEach("Deploy and prepare", async function() {
+            const snapShot = await timeMachine.takeSnapshot();
+            snapshotId = snapShot['result'];
+        });
 
-        await truffleAssert.eventEmitted(txObj, 'PlayerOneEndsGame', (ev) => {
+        afterEach(async() => {
+            await timeMachine.revertToSnapshot(snapshotId);
+        });
 
-            return  ev.player === playerOne &&
-                    ev.gameKey === gameKey &&
-                    ev.amount.toString(10) === "10"
-        },'PlayerOneEndsGame event is emitted');
+        it("Player one ends the game early and collects their stake", async () => {
 
-        const playerOneOwed = await rcp.balances(playerOne);
-        assert.strictEqual(playerOneOwed.toString(10), "10");
+            const gameKey = await rcp.createPlayerOneMoveHash(playerOne, playerOneSecretBytes32, PAPER);
+            await rcp.movePlayerOne(gameKey, "10", {from: playerOne, value: 10});
+            await timeMachine.advanceTimeAndBlock(DAY_24_HOUR_IN_SECS);
 
-    });
+            const txObj = await rcp.playerOneEndsGame(gameKey, {from: playerOne});
 
-    it("Player can withdraw their balance", async () => {
+            await truffleAssert.eventEmitted(txObj, 'PlayerOneEndsGame', (ev) => {
 
-        const gameKey = await rcp.createPlayerOneMoveHash(playerOne, playerOneSecretBytes32, ROCK);
-        await rcp.movePlayerOne(gameKey, "10", {from: playerOne, value: 10});
-        await rcp.playerOneEndsGame(gameKey, {from: playerOne});
+                return  ev.player === playerOne &&
+                        ev.gameKey === gameKey &&
+                        ev.amount.toString(10) === "10"
+            },'PlayerOneEndsGame event is emitted');
 
-        const initPlayerOneEthBalance = toBN(await getBalance(playerOne));
-        const txObj = await rcp.withdraw("5", {from: playerOne});
+            const playerOneOwed = await rcp.balances(playerOne);
+            assert.strictEqual(playerOneOwed.toString(10), "10");
 
-        await truffleAssert.eventEmitted(txObj, 'WithDraw', (ev) => {
+        });
 
-            return  ev.player === playerOne &&
-                ev.amount.toString(10) === "5"
-        },'WithDraw event is emitted');
+        it("Player can withdraw their balance", async () => {
 
-        const cost = await getGasCost(txObj);
-        const playerOneEthBalance = await getBalance(playerOne);
-        const playerOneOwed = await rcp.balances(playerOne);
-        const expectedPlayerOneEthBalance = initPlayerOneEthBalance.add(toBN(5)).sub(cost).toString(10);
+            const gameKey = await rcp.createPlayerOneMoveHash(playerOne, playerOneSecretBytes32, ROCK);
+            await rcp.movePlayerOne(gameKey, "10", {from: playerOne, value: 10});
+            await timeMachine.advanceTimeAndBlock(DAY_24_HOUR_IN_SECS);
+            await rcp.playerOneEndsGame(gameKey, {from: playerOne});
 
-        assert.strictEqual(playerOneEthBalance.toString(10), expectedPlayerOneEthBalance);
-        assert.strictEqual(playerOneOwed.toString(10), "5");
+            const initPlayerOneEthBalance = toBN(await getBalance(playerOne));
+            const txObj = await rcp.withdraw("5", {from: playerOne});
 
+            await truffleAssert.eventEmitted(txObj, 'WithDraw', (ev) => {
+
+                return  ev.player === playerOne &&
+                    ev.amount.toString(10) === "5"
+            },'WithDraw event is emitted');
+
+            const cost = await getGasCost(txObj);
+            const playerOneEthBalance = await getBalance(playerOne);
+            const playerOneOwed = await rcp.balances(playerOne);
+            const expectedPlayerOneEthBalance = initPlayerOneEthBalance.add(toBN(5)).sub(cost).toString(10);
+
+            assert.strictEqual(playerOneEthBalance.toString(10), expectedPlayerOneEthBalance);
+            assert.strictEqual(playerOneOwed.toString(10), "5");
+
+        });
     });
 
     describe('Game outcome calculated', async function(){
@@ -409,19 +424,21 @@ contract('rcp', async accounts => {
 
     describe('Player one move validation', async function() {
 
-/*        it("Call reverts when player one moves with an empty hash", async () => {
+
+        it("Call reverts when player one moves with an empty hash", async () => {
             await truffleAssert.reverts(
                 rcp.movePlayerOne(ZERO_BYTES_32, "10", {from: playerOne, value: 10}),
                 "Game key hash is empty"
             );
 
-        }).timeout(TIMEOUT);*/
+        }).timeout(TIMEOUT);
 
         it("Call reverts when player one moves with a game key already in use", async () => {
 
             const gameKey = await rcp.createPlayerOneMoveHash(playerOne, playerOneSecretBytes32, PAPER);
             await rcp.movePlayerOne(gameKey, "10", {from: playerOne, value: 10});
-            await rcp.playerOneEndsGame(gameKey, {from: playerOne});
+            const playerTwoMoveHash = await rcp.createPlayerTwoMoveHash(playerTwo, gameKey, playerTwoSecretBytes32, SCISSORS);
+            await rcp.movePlayerTwo(gameKey, playerTwoMoveHash, {from: playerTwo, value: 10});
 
             await truffleAssert.reverts(
                 rcp.movePlayerOne(gameKey, "10", {from: playerOne, value: 10}),
@@ -688,6 +705,18 @@ contract('rcp', async accounts => {
             );
 
         }).timeout(TIMEOUT);
+    });
+
+    it("Player ends the game before the game has expired", async () => {
+
+        const gameKey = await rcp.createPlayerOneMoveHash(playerOne, playerOneSecretBytes32, PAPER);
+        await rcp.movePlayerOne(gameKey, "10", {from: playerOne, value: 10});
+
+        await truffleAssert.reverts(
+            rcp.playerOneEndsGame(gameKey, {from: playerOne}),
+            GAME_NOT_EXPIRED_MSG
+        );
+
     });
 
     describe('Player hash creation validation', async function() {

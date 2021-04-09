@@ -121,6 +121,8 @@ contract RockPaperScissors is Ownable, Pausable {
         Game storage game = games[gameKey];
         require(game.playerOne == NULL_ADDRESS, "Game key already used");
 
+        uint256 expiryDate = block.timestamp.add(FORFEIT_WINDOW);
+        game.expiryDate = expiryDate;
         game.playerOne = msg.sender;
         game.step = Steps.PLAYER_ONE_MOVED;
         game.stake = stake;
@@ -140,7 +142,6 @@ contract RockPaperScissors is Ownable, Pausable {
         game.playerTwo = msg.sender;
         game.playerTwoMoveHash = moveHash;
         game.step = Steps.PLAYER_TWO_MOVED;
-
         depositStake(game.stake);
 
         emit PlayerTwoMoves(gameKey, msg.sender, msg.value, moveHash, expiryDate);
@@ -158,7 +159,7 @@ contract RockPaperScissors is Ownable, Pausable {
     function revealPlayerOne(bytes32 secret, Moves playerOneMove) external whenNotPaused {
 
         require(playerOneMove >= Moves.ROCK, INVALID_MOVE_MSG);
-        bytes32 gameKey = createPlayerOneMoveHash(msg.sender, secret, Moves(playerOneMove));
+        bytes32 gameKey = createPlayerOneMoveHash(msg.sender, secret, playerOneMove);
         Game storage game = games[gameKey];
 
         require(game.step == Steps.PLAYER_TWO_MOVED, INVALID_STEP_MSG);
@@ -166,8 +167,7 @@ contract RockPaperScissors is Ownable, Pausable {
 
         uint256 expiryDate = block.timestamp.add(FORFEIT_WINDOW);
         game.expiryDate = expiryDate;
-
-        game.playerOneMove = Moves(playerOneMove);
+        game.playerOneMove = playerOneMove;
 
         emit PlayerOneReveals(gameKey, msg.sender, playerOneMove, expiryDate);
     }
@@ -183,7 +183,7 @@ contract RockPaperScissors is Ownable, Pausable {
         bytes32 expectedMoveHash = createPlayerTwoMoveHash(msg.sender, gameKey, secret, playerTwoMove);
         require(game.playerTwoMoveHash == expectedMoveHash, HASH_MISMATCH_MSG);
 
-        emit PlayerTwoReveals(gameKey, msg.sender, Moves(playerTwoMove));
+        emit PlayerTwoReveals(gameKey, msg.sender, playerTwoMove);
 
         uint256 stake = game.stake;
         address playerOne = game.playerOne;
@@ -260,6 +260,7 @@ contract RockPaperScissors is Ownable, Pausable {
         require(game.step == Steps.PLAYER_ONE_MOVED, INVALID_STEP_MSG);
         address playerOne = game.playerOne;
         require(msg.sender == playerOne, INVALID_PLAYER_MSG);
+        require(block.timestamp >= game.expiryDate, GAME_NOT_EXPIRED_MSG);
 
         uint256 stake = game.stake;
         resetGame(game);
@@ -305,7 +306,7 @@ contract RockPaperScissors is Ownable, Pausable {
 
         require(gameKey != bytes32(0), "Game key cannot be empty");
         require(secret != bytes32(0), SECRET_EMPTY_MSG);
-        require(Moves(move) > Moves.EMPTY, INVALID_MOVE_MSG);
+        require(move > Moves.EMPTY, INVALID_MOVE_MSG);
 
         return keccak256(abi.encodePacked(player, gameKey, secret, move));
     }
