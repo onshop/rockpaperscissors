@@ -30,7 +30,6 @@ contract RockPaperScissors is Ownable, Pausable {
         PLAYER_TWO_MOVED, // 2
         PLAYER_ONE_REVEALED // 3
     }
-    Steps public steps;
 
     enum GameResult {
         DRAW, // 0
@@ -38,7 +37,6 @@ contract RockPaperScissors is Ownable, Pausable {
         RIGHTWIN, // 2
         INCORRECT // 3
     }
-    GameResult public gameResult;
 
     enum Moves {
         EMPTY, // 0
@@ -46,8 +44,6 @@ contract RockPaperScissors is Ownable, Pausable {
         PAPER, // 2
         SCISSORS // 3
     }
-
-    Moves public moves;
 
     struct Game {
         address playerOne;
