@@ -197,22 +197,21 @@ contract RockPaperScissors is Ownable, Pausable {
             balances[playerTwo] = balances[playerTwo].add(stake);
             DrawRefund(gameKey, playerOne, playerTwo, stake, stake);
 
-            return;
-
-        } else if (outcome == GameResult.LEFTWIN) {
-            winner = playerOne;
-            loser = playerTwo;
-        } else if (outcome == GameResult.RIGHTWIN) {
-            winner = playerTwo;
-            loser = playerOne;
         } else {
-            assert(false);
+            if (outcome == GameResult.LEFTWIN) {
+                winner = playerOne;
+                loser = playerTwo;
+            } else if (outcome == GameResult.RIGHTWIN) {
+                winner = playerTwo;
+                loser = playerOne;
+            } else {
+                assert(false);
+            }
+            resetGame(game);
+            uint256 winnings = stake.mul(2);
+            balances[winner] = balances[winner].add(winnings);
+            emit GamePayment(gameKey, winner, winnings);
         }
-        uint256 winnings = stake.mul(2);
-        balances[winner] = balances[winner].add(winnings);
-        emit GamePayment(gameKey, winner, winnings);
-
-        resetGame(game);
     }
 
     function resolveGame(Moves leftPlayer, Moves rightPlayer) public pure returns(GameResult) {
