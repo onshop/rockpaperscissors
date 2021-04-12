@@ -58,7 +58,8 @@ contract RockPaperScissors is Ownable, Pausable {
         bytes32 indexed gameKey,
         address indexed player,
         uint256 stake,
-        uint256 amount
+        uint256 amount,
+        uint256 expiryDate
     );
 
     event PlayerTwoMoves(
@@ -127,7 +128,7 @@ contract RockPaperScissors is Ownable, Pausable {
         game.stake = stake;
         depositStake(stake);
 
-        emit PlayerOneMoves(gameKey, msg.sender, stake, msg.value);
+        emit PlayerOneMoves(gameKey, msg.sender, stake, msg.value, expiryDate);
     }
 
     function movePlayerTwo(bytes32 gameKey, bytes32 moveHash) external payable whenNotPaused {

@@ -71,12 +71,16 @@ contract('rcp', async accounts => {
             const gameKey = await rcp.createPlayerOneMoveHash(playerOne, playerOneSecretBytes32, SCISSORS);
             const txObj = await rcp.movePlayerOne(gameKey, "10", {from: playerOne, value: 10});
 
+            const timestamp = await getBlockTimeStamp(txObj);
+            const expiryDate = timestamp + DAY_24_HOUR_IN_SECS;
+
             await truffleAssert.eventEmitted(txObj, 'PlayerOneMoves', (ev) => {
 
                 return  ev.player === playerOne &&
                         ev.gameKey === gameKey &&
                         ev.stake.toString(10) === "10" &&
-                        ev.amount.toString(10) === "10"
+                        ev.amount.toString(10) === "10" &&
+                        ev.expiryDate.toString(10) === expiryDate.toString(10)
             },'PlayerOneMoves event is emitted');
 
             const game = await rcp.games(gameKey);
@@ -89,7 +93,6 @@ contract('rcp', async accounts => {
 
             assert.strictEqual(playerOneOwed.toString(10), "0");
         });
-
         it("Value sent that exceeds the stake, is sent to the player's balance", async () => {
 
             const gameKey = await rcp.createPlayerOneMoveHash(playerOne, playerOneSecretBytes32, PAPER);
@@ -147,7 +150,6 @@ contract('rcp', async accounts => {
 
         });
     });
-
     describe("Player reveals", async () => {
 
         it("Player one reveals", async () => {
