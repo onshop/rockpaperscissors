@@ -242,15 +242,14 @@ contract RockPaperScissors is Ownable, Pausable {
 
         Game storage game = games[gameKey];
         require(game.step == Steps.PLAYER_TWO_MOVED, INVALID_STEP_MSG);
-        address playerTwo = game.playerTwo;
-        require(msg.sender == playerTwo, INVALID_PLAYER_MSG);
+        require(msg.sender == game.playerTwo, INVALID_PLAYER_MSG);
         require(block.timestamp >= game.expiryDate, GAME_NOT_EXPIRED_MSG);
 
         uint256 forfeit = game.stake.mul(2);
         resetGame(game);
-        balances[playerTwo] = balances[playerTwo].add(forfeit);
+        balances[msg.sender] = balances[msg.sender].add(forfeit);
 
-        emit ForfeitPaid(gameKey, playerTwo, forfeit);
+        emit ForfeitPaid(gameKey, msg.sender, forfeit);
     }
 
     function playerOneEndsGame(bytes32 gameKey) external whenNotPaused {
