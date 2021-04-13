@@ -93,15 +93,15 @@ contract('rcp', async accounts => {
 
             assert.strictEqual(playerOneOwed.toString(10), "0");
         });
-        it("Value sent that exceeds the stake, is sent to the player's balance", async () => {
+        it("Value exceeding the stake is sent to the player's balance", async () => {
 
-            const gameKey = await rcp.createPlayerOneMoveHash(playerOne, playerOneSecretBytes32, PAPER);
+            const gameKey1 = await rcp.createPlayerOneMoveHash(playerOne, playerOneSecretBytes32, PAPER);
 
             const initPlayerOneOwed = await rcp.balances(playerOne);
             assert.strictEqual(initPlayerOneOwed.toString(10), "0");
 
             // 7 - 5 = 2 is added to the balance
-            await rcp.movePlayerOne(gameKey, "5", {from: playerOne, value: 7});
+            await rcp.movePlayerOne(gameKey1, "5", {from: playerOne, value: 7});
 
             const playerOneOwed1 = await rcp.balances(playerOne);
             assert.strictEqual(playerOneOwed1.toString(10), "2");
