@@ -8,10 +8,15 @@
   },
   "dependencies": {
     "-": "0.0.1",
-    "@openzeppelin/contracts": "^3.3.0"
+    "@openzeppelin/contracts": "^3.3.0",
+    "ganache-time-traveler": "^1.0.15"
+  },
+  "mocha": {
+    "enableTimeouts": false,
+    "before_timeout": 2500000
   },
   "scripts": {
-    "test": "test"
+    "test": "test --timeout 2500000"
   },
   "repository": {
     "type": "git",
